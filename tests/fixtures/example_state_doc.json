@@ -1,0 +1,38 @@
+{
+  "database" : "prod-test-db",
+  "state_doc_bucket" : "bucket-to-hold-state-documents",
+  "snapshot_region" : "us-west-1",
+  "snapshot_date" : "2017-09-25",
+  "states" : [
+    {
+        "state" : "wait",
+        "timestamp" : 1506367783440,
+        "description" : "waiting for the 2017-09-25 snapshot of prod-test-db to come into existence."
+    },
+    {
+        "state" : "restore",
+        "timestamp" : 1506371158298,
+        "description" : "restoring the 2017-09-25 snapshot of prod-test-db to verification-prod-test-db database instance."
+    },
+    {
+        "state" : "verify",
+        "timestamp" : 1506372452779,
+        "description" : "verifying the restore of the 2017-09-25 snapshot of prod-test-db."
+    },
+    {
+        "state" : "clean",
+        "timestamp" : 1506372816307,
+        "description" : "cleaning up verification environment and verification-prod-test-db database instance."
+    },
+    {
+        "state" : "wait",
+        "timestamp" : 1506381927216,
+        "description" : "waiting for the 2017-09-26 snapshot of prod-test-db to come into existence."
+    },
+    {
+        "state" : "alarm",
+        "timestamp" : 1506372463881,
+        "description" : "alarming the restore/verify of the 2017-09-26 snapshot of prod-test-db failed!."
+    }
+  ]
+}

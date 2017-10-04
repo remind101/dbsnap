@@ -7,11 +7,14 @@ import json
 import boto3
 s3 = boto3.client("s3")
 
+from rds_funcs import (
+    get_database_description,
+    restore_from_latest_snapshot,
+)
+
 import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-secs_in_day = 86400
 
 def now_timestamp():
     return int(time())
@@ -34,17 +37,6 @@ def datetime_to_date_str(dt):
 def date_str_to_datetime(date_str):
     return datetime.datetime(*map(int, date_str.split("-")))
 
-def get_snapshot_description(event):
-    """if it exists return the snapshot definition, else None"""
-    return None
-
-def get_database_description(event):
-    """if it exists return the database definition, else None"""
-    return None
-
-def start_restore_from_snapshot(event):
-    pass
-
 def wait(state_doc):
     logger.info("Looking for the {snapshot_date} snapshot of {database}".format(**state_doc))
     description = get_snapshot_description(event)
@@ -59,10 +51,10 @@ def wait(state_doc):
         logger.info("Going to sleep.")
 
 def restore(state_doc):
-    description = get_database_descripton(state_doc)
+    description = get_database_descripton(state_doc["database"])
     if description is None:
         set_state_doc_in_s3(state_doc, "restore")
-        start_restore_from_snapshot(state_doc)
+        restore_from_latest_snapshot(state_doc["database"])
     elif description[DBInstanceStatus] == "available":
         set_state_doc_in_s3("verify")
         verify(state_doc, description)

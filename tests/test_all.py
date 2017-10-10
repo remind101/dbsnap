@@ -1,4 +1,4 @@
-from unittest import TestCase
+import unittest
 
 from dbsnap_verify import (
     state_doc_s3_key,
@@ -21,7 +21,7 @@ mock_no_such_key_exception = mock.Mock(side_effect=s3.exceptions.NoSuchKey({}, "
 mock_none = mock.Mock(return_value=None)
 
 @mock.patch('dbsnap_verify.upload_state_doc', mock_none)
-class Tests(TestCase):
+class Tests(unittest.TestCase):
 
     @mock.patch('dbsnap_verify.download_state_doc', mock_state_doc)
     def setUp(self):
@@ -59,5 +59,4 @@ class Tests(TestCase):
     def test_current_state(self):
         self.assertEqual(current_state(self.state_doc), "alarm")
 
-    def test_test(self):
-        self.assertTrue(1 == 1)
+

@@ -1,39 +1,87 @@
 from operator import itemgetter
 
-import boto3
-rds = boto3.client("rds")
+VALID_SNAPSHOT_TYPES = ["automated", "manual"]
 
-def get_database_description(db_instance_identifier):
-    descriptions = rds.describe_db_instances(
-        DBInstanceIdentifier=db_instance_identifier
-    )['DBInstances']
+
+def get_available_snapshots(session, db_id, snapshot_type=None):
+    """Returns DB snapshots in the available state for a given db id.
+    Args:
+        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api connection
+            where the database is located.
+        db_id (string): The database instance identifier whose snapshots you
+            want to examine.
+        snapshot_type (string): The type of snapshot to look for. One of:
+            'automated', 'manual'. If not provided will return snapshots of
+            both types.
+    Returns:
+        list: A list of dictionaries representing the resulting snapshots.
+    """
+    args = {'DBInstanceIdentifier': db_id}
+
+    if snapshot_type:
+        if snapshot_type not in VALID_SNAPSHOT_TYPES:
+            raise ValueError("Invalid snapshot_type: %s" % snapshot_type)
+        args["SnapshotType"] = snapshot_type
+
+    r = session.describe_db_snapshots(**args)
+    snapshots = r['DBSnapshots']
+    snapshots.sort(key=itemgetter("SnapshotCreateTime"))
+    return filter(lambda x: x["Status"] == "available", snapshots)
+
+
+def get_latest_snapshot(session, db_id):
+    """Returns the latest snapshot for a given database identifier.
+    Args:
+        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api connection
+            where the database is located.
+        db_id (string): The database instance identifier whose snapshots you
+            want to examine.
+    Returns:
+        string: The ID for the latest snapshot.
+    """
+    snapshots = get_available_snapshots(session, db_id, "automated")
+    if not snapshots:
+        raise ValueError("Unable to find any available snapshots for database "
+                         "id: %s" % db_id)
+    return snapshots[-1]['DBSnapshotIdentifier']
+
+
+def restore_from_latest_snapshot(session, db_id):
+    """
+    Args:
+        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
+            connection where the database is located.
+        db_id (string): The database instance identifier whose snapshots you
+            want to examine.
+    """
+    latest_snapshot_id = get_latest_snapshot(db_id)["DBSnapshotIdentifier"]
+
+    new_db_id = "dbsnap-verify-{}".format(db_id)
+
+    session.restore_db_instance_from_db_snapshot(
+        DBInstanceIdentifier=new_db_id,
+        DBSnapshotIdentifier=latest_snapshot_id,
+        PubliclyAccessible=False,
+        Tags=[
+            {"Key" : "Name", "Value" : new_db_id},
+            {"Key" : "dbsnap-verify", "Value" : "true"},
+        ],
+    )
+
+def get_database_description(session, db_id):
+    """
+    Args:
+        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
+            connection where the database is located.
+        db_id (string): The RDS database instance identifier.
+    Returns:
+        dictionary: description of RDS database instance
+    """
+    descriptions = session.describe_db_instances(
+        DBInstanceIdentifier=db_id)['DBInstances']
     if len(descriptions) == 1:
         return descriptions[0]
     elif len(descriptions) > 1:
         raise Exception(
-            "DBInstanceIdentifier ({}) matches multiple instances".format(
-                db_instance_identifier
-            )
+            "DBInstanceIdentifier ({}) multiple RDS DBs found!".format(db_id)
         )
-
-def get_snapshot_descriptions(db_instance_identifier):
-    descriptions = rds.describe_db_snapshots(
-        DBInstanceIdentifier=db_instance_identifier
-    )['DBSnapshots']
-    descriptions.sort(key=itemgetter("SnapshotCreateTime"))
-    return descriptions
-
-def restore_from_latest_snapshot(db_instance_identifier):
-    latest_snapshot_desc = get_snapshot_descriptions(db_instance_identifier)[-1]
-
-    new_db_instance_identifier = "dbsnap-verify-{}".format(db_instance_identifier)
-
-    rds.restore_db_instance_from_db_snapshot(
-        DBInstanceIdentifier=new_db_instance_identifier,
-        DBSnapshotIdentifier=latest_snapshot_desc["DBSnapshotIdentifier"],
-        PubliclyAccessible=False,
-        Tags=[
-            {"Key" : "Name", "Value" : new_db_instance_identifier}
-            {"Key" : "dbsnap-verify", "Value" : "true"}
-        ],
-    )

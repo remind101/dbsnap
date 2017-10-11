@@ -1,0 +1,12 @@
+{
+  "database" : "prod-test-db",
+  "state_doc_bucket" : "bucket-to-hold-state-documents",
+  "snapshot_region" : "us-west-1",
+  "checks" : [
+    {
+      "type" : "query",
+      "query" : "SELECT * FROM pg_catalog.pg_tables;",
+      "regex" : "mytable"
+    }
+  ]
+}

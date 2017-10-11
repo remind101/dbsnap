@@ -46,6 +46,14 @@ def get_latest_snapshot(session, db_id):
     return snapshots[-1]['DBSnapshotIdentifier']
 
 
+def dbsnap_verify_db_id(db_id):
+    """
+    Args:
+        db_id (string): The database instance identifier to derive new name.
+    """
+    return "dbsnap-verify-{}".format(db_id)
+
+
 def restore_from_latest_snapshot(session, db_id):
     """
     Args:
@@ -56,7 +64,7 @@ def restore_from_latest_snapshot(session, db_id):
     """
     latest_snapshot_id = get_latest_snapshot(db_id)["DBSnapshotIdentifier"]
 
-    new_db_id = "dbsnap-verify-{}".format(db_id)
+    new_db_id = dbsnap_verify_db_id(db_id)
 
     session.restore_db_instance_from_db_snapshot(
         DBInstanceIdentifier=new_db_id,
@@ -67,6 +75,7 @@ def restore_from_latest_snapshot(session, db_id):
             {"Key" : "dbsnap-verify", "Value" : "true"},
         ],
     )
+
 
 def get_database_description(session, db_id):
     """
@@ -83,3 +92,6 @@ def get_database_description(session, db_id):
         )['DBInstances'][0]
     except session.exceptions.DBInstanceNotFoundFault:
         return None
+
+def get_database_description_for_verify(session, db_id):
+    return get_database_description(session, dbsnap_verify_db_id(db_id))

@@ -62,7 +62,7 @@ def restore_from_latest_snapshot(session, db_id):
         db_id (string): The database instance identifier whose snapshots you
             want to examine.
     """
-    latest_snapshot_id = get_latest_snapshot(db_id)["DBSnapshotIdentifier"]
+    latest_snapshot_id = get_latest_snapshot(session, db_id)
 
     new_db_id = dbsnap_verify_db_id(db_id)
 

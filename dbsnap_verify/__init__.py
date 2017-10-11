@@ -5,6 +5,7 @@ import datetime
 import json
 
 from rds_funcs import (
+    get_latest_snapshot,
     get_database_description_for_verify,
     restore_from_latest_snapshot,
 )
@@ -12,6 +13,10 @@ from rds_funcs import (
 import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+import boto3
+s3 = boto3.client("s3")
+rds = boto3.client("rds", region_name="us-east-1")
 
 def now_timestamp():
     return int(time())
@@ -36,9 +41,9 @@ def date_str_to_datetime(date_str):
 
 def wait(state_doc):
     logger.info("Looking for the {snapshot_date} snapshot of {database}".format(**state_doc))
-    description = get_snapshot_description(event)
+    description = get_latest_snapshot(rds, state_doc["database"])
     if description:
-        restore(event, state_doc)
+        restore(state_doc)
     elif today_date() > date_str_to_datetime(state_doc["snapshot_date"]):
         logger.warning("Alert! we never found the {snapshot_date} snapshot for {database}".format(**state_doc))
         alarm("asdfasdfasdkfjnasdf naskdfn aksdjfn")
@@ -48,11 +53,11 @@ def wait(state_doc):
         logger.info("Going to sleep.")
 
 def restore(state_doc):
-    description = get_database_description_for_verify(state_doc["database"])
+    description = get_database_description_for_verify(rds, state_doc["database"])
     if description is None:
         set_state_doc_in_s3(state_doc, "restore")
-        restore_from_latest_snapshot(state_doc["database"])
-    elif description[DBInstanceStatus] == "available":
+        restore_from_latest_snapshot(rds, state_doc["database"])
+    elif description["DBInstanceStatus"] == "available":
         set_state_doc_in_s3(state_doc, "verify")
         verify(state_doc, description)
         
@@ -82,10 +87,9 @@ def alarm(state_doc):
     pass
 
 def upload_state_doc(state_doc):
-    s3 = boto3.client("s3")
-    state_doc_json = json.dumps(state_doc)
+    state_doc_json = json.dumps(state_doc, indent=2)
     s3.put_object(
-        Bucket=state_doc["state_dot_bucket"],
+        Bucket=state_doc["state_doc_bucket"],
         Key=state_doc_s3_key(state_doc["database"]),
         Body=state_doc_json,
     )
@@ -106,7 +110,6 @@ def state_doc_s3_key(database):
     return "state-doc-{}.json".format(database)
 
 def download_state_doc(config):
-    s3 = boto3.client("s3")
     s3_object = s3.get_object(
         Bucket=config["state_doc_bucket"],
         Key=state_doc_s3_key(config["database"]),
@@ -137,7 +140,7 @@ state_handlers = {
   "alarm": alarm,
 }
 
-def main(json_config):
+def handler(json_config):
     """The main entrypoint called from CLI or when our AWS Lambda wakes up."""
     config = json.loads(json_config)
     state_doc = get_or_create_state_doc_in_s3(config)
@@ -146,4 +149,4 @@ def main(json_config):
 
 def lambda_handler(event, context):
     """The main entrypoint called when our AWS Lambda wakes up."""
-    main(event)
+    handler(event)

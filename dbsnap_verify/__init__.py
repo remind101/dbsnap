@@ -6,13 +6,18 @@ import json
 
 from rds_funcs import (
     get_latest_snapshot,
-    get_database_description_for_verify,
+    get_database_description,
     restore_from_latest_snapshot,
+    reset_master_password,
+    dbsnap_verify_db_id,
 )
 
 import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+ch1 = logging.StreamHandler()
+logger.addHandler(ch1)
+
 
 import boto3
 s3 = boto3.client("s3")
@@ -53,16 +58,17 @@ def wait(state_doc):
         logger.info("Going to sleep.")
 
 def restore(state_doc):
-    description = get_database_description_for_verify(rds, state_doc["database"])
+    description = get_database_description(rds, state_doc["tmp_database"])
     if description is None:
         set_state_doc_in_s3(state_doc, "restore")
         restore_from_latest_snapshot(rds, state_doc["database"])
     elif description["DBInstanceStatus"] == "available":
         set_state_doc_in_s3(state_doc, "verify")
-        verify(state_doc, description)
+        verify(state_doc)
         
-def verify(state_doc, description):
-    reset_master_password()
+def verify(state_doc):
+    description = get_database_description(rds, state_doc["tmp_database"])
+    raw_password = reset_master_password(rds, state_doc["tmp_database"])
     connection = connect_to_endpoint(description["endpoint"])
     result = run_all_the_tests(connection, state_doc["verfication_checks"])
     if result:
@@ -75,11 +81,11 @@ def verify(state_doc, description):
     clean_up(state_doc)
 
 def cleanup(state_doc):
-    description = get_database_descripton(state_doc)
+    description = get_database_description(rds, state_doc["tmp_database"])
     if description is None:
         # start waiting for tomorrows date.
         set_state_doc_in_s3(state_doc, "wait")
-    elif description[DBInstanceStatus] == "available":
+    elif description["DBInstanceStatus"] == "available":
         destroy_database(state_doc)
 
 def alarm(state_doc):
@@ -126,6 +132,7 @@ def get_or_create_state_doc_in_s3(config):
     except s3.exceptions.NoSuchKey:
         state_doc = config
         state_doc["snapshot_date"] = datetime_to_date_str(tomorrow_date())
+        state_doc["tmp_database"] = dbsnap_verify_db_id(state_doc["database"])
         state_doc = set_state_doc_in_s3(state_doc, "wait")
     return state_doc
 

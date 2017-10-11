@@ -1,6 +1,27 @@
 from operator import itemgetter
 
+from random import choice
+
+from string import (
+    letters,
+    digits,
+)
+
 VALID_SNAPSHOT_TYPES = ["automated", "manual"]
+
+
+def generate_password(size = 9, pool = None):
+    """
+    Return a system generated password.
+    :param size:
+        The desired length of the password to generate. (Default 9)
+    :param pool:
+        Pool of chars to choose from. (Default digits and letters [upper/lower])
+    :returns: String (raw password)
+    """
+    if pool == None:
+        pool = letters + digits
+    return ''.join( [ choice( pool ) for i in range( size ) ] )
 
 
 def get_available_snapshots(session, db_id, snapshot_type=None):
@@ -93,5 +114,21 @@ def get_database_description(session, db_id):
     except session.exceptions.DBInstanceNotFoundFault:
         return None
 
-def get_database_description_for_verify(session, db_id):
-    return get_database_description(session, dbsnap_verify_db_id(db_id))
+
+def reset_master_password(session, db_id):
+    """
+    Args:
+        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
+            connection where the database is located.
+        db_id (string): The RDS database instance identifier to reset.
+    Returns:
+        string: new password
+    """
+    # 16 chars was an arbitrary choice.
+    new_password = generate_password(16)
+    session.modify_db_instance(
+        DBInstanceIdentifier=db_id,
+        MasterUserPassword=new_password,
+        ApplyImmediately=True,
+    )
+    return new_password

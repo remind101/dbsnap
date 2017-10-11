@@ -5,7 +5,12 @@ import mock
 from dbsnap_verify.rds_funcs import (
     get_available_snapshots,
     get_latest_snapshot,
+    get_database_description,
 )
+
+import boto3
+rds = boto3.client("rds")
+
 
 class TestRdsFuncs(unittest.TestCase):
 
@@ -22,16 +27,16 @@ class TestRdsFuncs(unittest.TestCase):
                  "Status": "pending", "SnapshotCreateTime": 200},
             ]
         }
-        self.db_instances = {
+        self.db_instance_1 = {
             "DBInstances": [
-                {"DBInstanceIdentifier": "rds:instance1",
-                 "Status": "available", "InstanceCreateTime": 1},
-                {"DBSnapshotIdentifier": "rds:instance2",
-                 "Status": "available", "InstanceCreateTime": 2.3},
-                {"DBSnapshotIdentifier": "rds:instance3",
-                 "Status": "available", "InstanceCreateTime": 10},
-                {"DBSnapshotIdentifier": "rds:instance4",
-                 "Status": "creating", "InstanceCreateTime": 200},
+                {"DBSnapshotIdentifier": "instance1",
+                 "Status": "available", "InstanceCreateTime": 100},
+            ]
+        }
+        self.db_instance_2 = {
+            "DBInstances": [
+                {"DBSnapshotIdentifier": "instance2",
+                 "Status": "creating", "InstanceCreateTime": 100},
             ]
         }
 
@@ -62,6 +67,13 @@ class TestRdsFuncs(unittest.TestCase):
 
     def test_get_database_description(self):
         session = mock.MagicMock()
-        session.describe_db_snapshots.return_value = self.snapshots
-        r = get_latest_snapshot(session, "my-db")
-        self.assertEqual(r, "rds:snapshot3")
+        session.describe_db_instances.return_value = self.db_instance_1
+        r = get_database_description(session, "instance1")
+        self.assertEqual(r["DBSnapshotIdentifier"], "instance1")
+
+    def test_get_database_description_is_none(self):
+        session = mock.MagicMock()
+        session.exceptions.DBInstanceNotFoundFault = rds.exceptions.DBInstanceNotFoundFault
+        session.describe_db_instances.side_effect = rds.exceptions.DBInstanceNotFoundFault({}, '')
+        r = get_database_description(session, "instanceX")
+        self.assertEqual(r, None)

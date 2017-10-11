@@ -77,11 +77,9 @@ def get_database_description(session, db_id):
     Returns:
         dictionary: description of RDS database instance
     """
-    descriptions = session.describe_db_instances(
-        DBInstanceIdentifier=db_id)['DBInstances']
-    if len(descriptions) == 1:
-        return descriptions[0]
-    elif len(descriptions) > 1:
-        raise Exception(
-            "DBInstanceIdentifier ({}) multiple RDS DBs found!".format(db_id)
-        )
+    try:
+        return session.describe_db_instances(
+            DBInstanceIdentifier=db_id
+        )['DBInstances'][0]
+    except session.exceptions.DBInstanceNotFoundFault:
+        return None

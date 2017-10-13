@@ -6,13 +6,13 @@ from setuptools import (
 
 setup( 
     name = 'dbsnap_verify',
-    version = '0.0.2',
+    version = '0.0.4',
     description = 'Tool for verifying AWS RDS snapshots.',
     keywords = 'aws rds snapshot tool infrastructure',
     long_description = open('README.rst').read(),
 
     author = 'Russell Ballestrini',
-    author_email = 'russell@ballestrini.net',
+    author_email = 'russell@remind101.com',
     url = 'https://github.com/remind101/dbsnap-verify',
 
     license='New BSD license',
@@ -30,7 +30,7 @@ setup(
     ],
     entry_points = {
       'console_scripts': [
-        'dbsnap-copy = dbsnap_copy.__main__:main',
+        'dbsnap-verify = dbsnap_verify.__main__:main',
       ],
     },
     classifiers=[

@@ -8,8 +8,10 @@ from rds_funcs import (
     get_latest_snapshot,
     get_database_description,
     restore_from_latest_snapshot,
-    reset_master_password,
+    modify_db_instance_for_verify,
     dbsnap_verify_db_id,
+    destroy_database,
+    destroy_database_subnet_group,
 )
 
 import logging
@@ -18,10 +20,10 @@ logger.setLevel(logging.INFO)
 ch1 = logging.StreamHandler()
 logger.addHandler(ch1)
 
-
 import boto3
 s3 = boto3.client("s3")
 rds = boto3.client("rds", region_name="us-east-1")
+
 
 def now_timestamp():
     return int(time())
@@ -44,6 +46,13 @@ def datetime_to_date_str(dt):
 def date_str_to_datetime(date_str):
     return datetime.datetime(*map(int, date_str.split("-")))
 
+def add_db_description(function):
+    def wrapper(state_doc, db_description=None):
+        if db_description is None:
+            db_description = get_database_description(rds, state_doc["tmp_database"])
+        function(state_doc, db_description)
+    return wrapper
+
 def wait(state_doc):
     logger.info("Looking for the {snapshot_date} snapshot of {database}".format(**state_doc))
     description = get_latest_snapshot(rds, state_doc["database"])
@@ -57,36 +66,51 @@ def wait(state_doc):
         logger.info("Did not find the {snapshot_date} snapshot of {database}".format(**state_doc))
         logger.info("Going to sleep.")
 
-def restore(state_doc):
-    description = get_database_description(rds, state_doc["tmp_database"])
-    if description is None:
+@add_db_description
+def restore(state_doc, db_description=None):
+    if db_description is None:
         set_state_doc_in_s3(state_doc, "restore")
-        restore_from_latest_snapshot(rds, state_doc["database"])
-    elif description["DBInstanceStatus"] == "available":
-        set_state_doc_in_s3(state_doc, "verify")
-        verify(state_doc)
-        
-def verify(state_doc):
-    description = get_database_description(rds, state_doc["tmp_database"])
-    raw_password = reset_master_password(rds, state_doc["tmp_database"])
-    connection = connect_to_endpoint(description["endpoint"])
-    result = run_all_the_tests(connection, state_doc["verfication_checks"])
-    if result:
-        set_state_doc_in_s3(state_doc, "success")
-        alarm(state_doc, "success")
-    else:
-        set_state_doc_in_s3(state_doc, "alarm")
-        alarm(state_doc, "error")
-    set_state_doc_in_s3(state_doc, "cleanup")
-    clean_up(state_doc)
+        sn_ids = state_doc["database_sn_ids"]
+        if isinstance(sn_ids, basestring):
+            sn_ids = sn_ids.split(",")
+        restore_from_latest_snapshot(rds, state_doc["database"], sn_ids)
+    elif db_description["DBInstanceStatus"] == "available":
+        set_state_doc_in_s3(state_doc, "modify")
+        modify(state_doc, db_description)
 
-def cleanup(state_doc):
-    description = get_database_description(rds, state_doc["tmp_database"])
-    if description is None:
+@add_db_description
+def modify(state_doc, db_description=None):
+    sg_ids = state_doc["database_sg_ids"]
+    if isinstance(sg_ids, basestring):
+        sg_ids = sg_ids.split(",")
+    state_doc["tmp_password"] = modify_db_instance_for_verify(
+        rds, state_doc["tmp_database"], sg_ids,
+    )
+    set_state_doc_in_s3(state_doc, "verify")
+
+@add_db_description
+def verify(state_doc, db_description=None):
+    if db_description["DBInstanceStatus"] == "available":
+        #connection = connect_to_endpoint(db_description["endpoint"])
+        #result = run_all_the_tests(connection, state_doc["verfication_checks"])
+        #if result:
+        #    set_state_doc_in_s3(state_doc, "success")
+        #    alarm(state_doc, "success")
+        #else:
+        #    set_state_doc_in_s3(state_doc, "alarm")
+        #    alarm(state_doc, "error")
+        set_state_doc_in_s3(state_doc, "cleanup")
+        cleanup(state_doc, db_description)
+
+@add_db_description
+def cleanup(state_doc, db_description=None):
+    if db_description is None:
         # start waiting for tomorrows date.
+        del state_doc["tmp_password"]
+        destroy_database_subnet_group(rds, state_doc["tmp_database"])
         set_state_doc_in_s3(state_doc, "wait")
-    elif description["DBInstanceStatus"] == "available":
-        destroy_database(state_doc)
+    elif db_description["DBInstanceStatus"] == "available":
+        destroy_database(rds, state_doc["tmp_database"], db_description["DBInstanceArn"])
 
 def alarm(state_doc):
     # trigger an alarm, maybe cloudwatch or something.
@@ -142,18 +166,14 @@ def current_state(state_doc):
 state_handlers = {
   "wait": wait,
   "restore": restore,
+  "modify": modify,
   "verify": verify,
   "cleanup": cleanup,
   "alarm": alarm,
 }
 
-def handler(json_config):
+def handler(config):
     """The main entrypoint called from CLI or when our AWS Lambda wakes up."""
-    config = json.loads(json_config)
     state_doc = get_or_create_state_doc_in_s3(config)
     state_handler = state_handlers[current_state(state_doc)]
     state_handler(state_doc)
-
-def lambda_handler(event, context):
-    """The main entrypoint called when our AWS Lambda wakes up."""
-    handler(event)

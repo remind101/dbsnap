@@ -10,18 +10,19 @@ from string import (
 VALID_SNAPSHOT_TYPES = ["automated", "manual"]
 
 
-def generate_password(size = 9, pool = None):
+def generate_password(size=9, pool=None):
     """
     Return a system generated password.
-    :param size:
-        The desired length of the password to generate. (Default 9)
-    :param pool:
-        Pool of chars to choose from. (Default digits and letters [upper/lower])
-    :returns: String (raw password)
+    Args:
+        size (int): The desired length of the password to generate (Default 9).
+        pool (list): list of chars to choose from.
+            (Default digits and letters [upper/lower])
+    Returns:
+        str: the raw password
     """
     if pool == None:
         pool = letters + digits
-    return ''.join( [ choice( pool ) for i in range( size ) ] )
+    return ''.join([choice(pool) for i in range(size)])
 
 
 def get_available_snapshots(session, db_id, snapshot_type=None):
@@ -29,9 +30,9 @@ def get_available_snapshots(session, db_id, snapshot_type=None):
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api connection
             where the database is located.
-        db_id (string): The database instance identifier whose snapshots you
+        db_id (str): The database instance identifier whose snapshots you
             want to examine.
-        snapshot_type (string): The type of snapshot to look for. One of:
+        snapshot_type (str): The type of snapshot to look for. One of:
             'automated', 'manual'. If not provided will return snapshots of
             both types.
     Returns:
@@ -55,10 +56,10 @@ def get_latest_snapshot(session, db_id):
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api connection
             where the database is located.
-        db_id (string): The database instance identifier whose snapshots you
+        db_id (str): The database instance identifier whose snapshots you
             want to examine.
     Returns:
-        string: The ID for the latest snapshot.
+        str: The ID for the latest snapshot.
     """
     snapshots = get_available_snapshots(session, db_id, "automated")
     if not snapshots:
@@ -70,27 +71,35 @@ def get_latest_snapshot(session, db_id):
 def dbsnap_verify_db_id(db_id):
     """
     Args:
-        db_id (string): The database instance identifier to derive new name.
+        db_id (str): The database instance identifier to derive new name.
     """
     return "dbsnap-verify-{}".format(db_id)
 
 
-def restore_from_latest_snapshot(session, db_id):
+def restore_from_latest_snapshot(session, db_id, sn_ids):
     """
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
             connection where the database is located.
-        db_id (string): The database instance identifier whose snapshots you
+        db_id (str): The database instance identifier whose snapshots you
             want to examine.
     """
     latest_snapshot_id = get_latest_snapshot(session, db_id)
 
     new_db_id = dbsnap_verify_db_id(db_id)
 
+    session.create_db_subnet_group(
+      DBSubnetGroupName = new_db_id,
+      DBSubnetGroupDescription = new_db_id,
+      SubnetIds = sn_ids,
+    )
+
     session.restore_db_instance_from_db_snapshot(
         DBInstanceIdentifier=new_db_id,
+        DBSubnetGroupName=new_db_id,
         DBSnapshotIdentifier=latest_snapshot_id,
         PubliclyAccessible=False,
+        MultiAZ=False,
         Tags=[
             {"Key" : "Name", "Value" : new_db_id},
             {"Key" : "dbsnap-verify", "Value" : "true"},
@@ -103,7 +112,7 @@ def get_database_description(session, db_id):
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
             connection where the database is located.
-        db_id (string): The RDS database instance identifier.
+        db_id (str): The RDS database instance identifier.
     Returns:
         dictionary: description of RDS database instance
     """
@@ -115,20 +124,77 @@ def get_database_description(session, db_id):
         return None
 
 
-def reset_master_password(session, db_id):
+def modify_db_instance_for_verify(session, db_id, sg_ids):
     """
+    Modify RDS DB Instance to allow connections.
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
             connection where the database is located.
-        db_id (string): The RDS database instance identifier to reset.
+        db_id (str): The RDS database instance identifier to reset.
     Returns:
-        string: new password
+        str: new raw password
     """
     # 16 chars was an arbitrary choice.
     new_password = generate_password(16)
     session.modify_db_instance(
-        DBInstanceIdentifier=db_id,
-        MasterUserPassword=new_password,
         ApplyImmediately=True,
+        DBInstanceIdentifier=db_id,
+        VpcSecurityGroupIds=sg_ids,
+        BackupRetentionPeriod=0,
+        MasterUserPassword=new_password,
     )
     return new_password
+
+
+def make_tag_dict(tag_list):
+    """
+    Return a dictionary of existing tags.
+    Args:
+        tag_list (list): a list of tag dicts.
+    Returns:
+        dict: A dictionary where tag names are keys and tag values are values.
+    """
+    tag_dict = {}
+    for tag in tag_list:
+        tag_dict[tag['Key']] = tag['Value']
+    return tag_dict
+
+
+def destroy_database(session, db_id, db_arn=None):
+    """
+    Destroy the RDS db instance.
+    Args:
+        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
+            connection where the database is located.
+        db_id (str): The RDS database instance identifier to destroy.
+    """
+    if db_arn is None:
+        description = get_database_description(session, db_id)
+        db_arn = description["DBInstanceArn"]
+
+    tags = make_tag_dict(
+        session.list_tags_for_resource(ResourceName=db_arn)["TagList"]
+    )
+
+    if tags.get("dbsnap-verify", "false") != "true":
+        raise Exception(
+            "sheepishly refusing to destroy {}, missing `dbsnap-verify` tag"
+        )
+
+    session.delete_db_instance(
+        DBInstanceIdentifier=db_id,
+        SkipFinalSnapshot=True
+    )
+
+
+def destroy_database_subnet_group(session, db_id):
+    """
+    Destroy the RDS db instance subnet group.
+    Args:
+        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
+            connection where the database is located.
+        db_id (str): The RDS database instance subnet identifier to destroy.
+    """
+    session.delete_db_subnet_group(
+        DBSubnetGroupName=db_id,
+    )

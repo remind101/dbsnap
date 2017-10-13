@@ -1,5 +1,7 @@
 import argparse
 
+import json
+
 from . import handler
 
 def main():
@@ -7,8 +9,8 @@ def main():
     parser.add_argument('config', help='The path to JSON config.')
     args = parser.parse_args()
     with open(args.config) as json_file:
-        json_config = json_file.read()
-    handler(json_config)
+        config = json.load(json_file)
+    handler(config)
 
 if __name__ == "__main__":
     main()

@@ -1,35 +1,91 @@
 dbsnap-verify
 #####################
 
-Verify RDS Snapshots
+verify AWS RDS DB snapshots.
 
-There is a CLI version::
+This program may execute as either a CLI tool or an AWS Lambda.
+
+The program uses the "unreliable town clock" pattern.
+This means it expects to be "chimed" every 15m or so using a mechanism like crontab or a scheduled Cloudwatch Rule. 
+
+The program is a state machine, it changes behavior based on the current state.
+It will store execution state as a JSON document in a local file or in ``S3``.
+If you decide to store the state document in ``S3`` the executing role will need read and write access.
+
+The role will also need the ability to do most ``RDS`` actions.
+TODO: harden the list of ``RDS`` and put them here.
+
+
+Install
+===============
+
+You may install this tool into your Python environment by running::
+
+ python setup.py develop
+
+Verify install::
 
  ./dbsnap-version --help
 
+The tool expects to be passed a JSON config file that mirrors the same config that the AWS Lambda would be provided.
+
+An example `dbsnap-verify-config.json <https://github.com/remind101/dbsnap-verify/blob/import/tests/fixtures/config_or_event.json>`_ may be found here.
+
+
 AWS Lambda
-=============
+===============
 
-You can also build an AWS Lambda zip.
-All commands assume you are in the root of this repo.
+You may build an AWS Lambda zip. This command assumes you have Python ``virtualenv`` installed::
 
-1. create a `virtualenv` and activate it::
+ make build-lambda
 
- virtualenv env
- . env/bin/activate
+In our case use use a Cloudwatch Rule Event Trigger to invoke our Lambda at a ``rate(15 minutes)``.
 
-2. install `dbsnap-verify` and all its dependencies into `virtualenv`::
+The payload of this Cloudwatch Rule is a Static JSON value and is in the same form as the config used for the CLI.
 
- python setup.py install
 
-3. copy all dependencies from `virtualenv` into root `dist` directory::
+config.json
+===============
 
- cp aws_lambda.py dist
- cp -rf env/lib/python2.7/site-packages/* dist
+An example `dbsnap-verify-config.json <https://github.com/remind101/dbsnap-verify/blob/import/tests/fixtures/config_or_event.json>`_ may be found here.
 
-4. create zip file::
+database (string):
+ The AWS RDS DB Identifier whose snapshot we should restore/verify.
 
-  cd dist
-  DATE=`date +%Y-%m-%d`
-  zip -r ../lambda-dbsnap-verify-$DATE.zip . 
-  cd ..
+database_sg_ids (string):
+ A CSV of security group ids to add to the newly restored temporary database instance.
+
+database_sn_ids (string):
+ A CSV of subnet ids to create a database subnet group with.
+
+snapshot_region (string):
+ The region to find the snapshot and restore/verify in.
+
+state_doc_path (string):
+ The path to the local file to store the state document.
+ If you choose this, do not set ``state_doc_bucket``.
+
+state_doc_bucket (string):
+ The S3 bucket to store the state document.
+ If you choose this, do not set ``state_doc_path``.
+
+
+state_doc
+===============
+
+The state machine uses a JSON ``state_doc`` to keep track of it's state and configuration.
+This ``state_doc`` may be stored in either a local file or ``S3``.
+
+You do not need to create this document, the tool manages it automatically.
+
+An `example_state_doc.json <https://github.com/remind101/dbsnap-verify/blob/import/tests/fixtures/example_state_doc.json>`_ may be found here.
+
+
+State Machine
+===============
+
+Here is a diagram of the state machine transitions and states.
+
+.. image:: https://github.com/remind101/dbsnap-verify/raw/import/dbsnap-verify-rds-snapshot-verification-lambda-s3-state-machine.png
+  :align: center
+

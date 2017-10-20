@@ -1,6 +1,6 @@
 import unittest
 
-from dbsnap_verify import (
+from dbsnap_verify.state_doc import (
     state_doc_s3_key,
     get_or_create_state_doc_in_s3,
     current_state,
@@ -20,10 +20,10 @@ mock_state_doc = mock.Mock(return_value=EXAMPLE_STATE_DOC)
 mock_no_such_key_exception = mock.Mock(side_effect=s3.exceptions.NoSuchKey({}, ""))
 mock_none = mock.Mock(return_value=None)
 
-@mock.patch('dbsnap_verify.upload_state_doc', mock_none)
+@mock.patch('dbsnap_verify.state_doc.upload_state_doc', mock_none)
 class Tests(unittest.TestCase):
 
-    @mock.patch('dbsnap_verify.download_state_doc', mock_state_doc)
+    @mock.patch('dbsnap_verify.state_doc.download_state_doc', mock_state_doc)
     def setUp(self):
         # mock the static json config in the Cloudwatch event rule trigger.
         # an AWS Lambda always accepts `event` as its first argument.
@@ -40,7 +40,7 @@ class Tests(unittest.TestCase):
             "state-doc-prod-test-db.json"
         )
 
-    @mock.patch('dbsnap_verify.download_state_doc', mock_no_such_key_exception)
+    @mock.patch('dbsnap_verify.state_doc.download_state_doc', mock_no_such_key_exception)
     def test_get_or_create_state_doc_in_s3_missing_key(self):
         """Returns a new state_doc when one is not found in s3"""
         state_doc = get_or_create_state_doc_in_s3(self.event)

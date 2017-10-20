@@ -15,6 +15,11 @@
         "description" : "restoring the 2017-09-25 snapshot of prod-test-db to verification-prod-test-db database instance."
     },
     {
+        "state" : "modify",
+        "timestamp" : 1506372452345,
+        "description" : "modifying the restore of the 2017-09-25 snapshot of prod-test-db to allow secure access."
+    },
+    {
         "state" : "verify",
         "timestamp" : 1506372452779,
         "description" : "verifying the restore of the 2017-09-25 snapshot of prod-test-db."

@@ -6,6 +6,7 @@ __pycache__/
 *.zip
 
 config.json
+bucket-to-hold-state-documents
 
 # C extensions
 *.so

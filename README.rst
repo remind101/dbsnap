@@ -43,6 +43,7 @@ In our case use use a Cloudwatch Rule Event Trigger to invoke our Lambda at a ``
 
 The payload of this Cloudwatch Rule is a Static JSON value and is in the same form as the config used for the CLI.
 
+An example `dbsnap-verify-config.json <https://github.com/remind101/dbsnap-verify/blob/import/tests/fixtures/config_or_event.json>`_ may be found here.
 
 config.json
 ===============

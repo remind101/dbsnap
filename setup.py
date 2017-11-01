@@ -22,7 +22,7 @@ setup(
     install_requires = [
         'boto3',
     ],
-    tests_requires = [
+    tests_require = [
         'nose',
         'mock',
         'funcsigs',

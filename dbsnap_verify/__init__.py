@@ -19,25 +19,20 @@ from time_funcs import (
     today_date,
 )
 
+import boto3
+
+from sys import stdout
 import logging
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler(stdout))
 
-import boto3
-rds = boto3.client("rds", region_name="us-east-1")
 
-
-def add_db_description(function):
-    def wrapper(state_doc, db_description=None):
-        if db_description is None:
-            db_description = get_database_description(rds, state_doc["tmp_database"])
-        function(state_doc, db_description)
-    return wrapper
-
-def wait(state_doc):
+def wait(state_doc, rds_session):
     logger.info("Looking for the {snapshot_date} snapshot of {database}".format(**state_doc))
-    description = get_latest_snapshot(rds, state_doc["database"])
+    description = get_latest_snapshot(rds_session, state_doc["database"])
     if description:
-        restore(state_doc)
+        restore(state_doc, rds_session)
     elif today_date() > date_str_to_datetime(state_doc["snapshot_date"]):
         logger.warning("Alert! we never found the {snapshot_date} snapshot for {database}".format(**state_doc))
         alarm("asdfasdfasdkfjnasdf naskdfn aksdjfn")
@@ -46,31 +41,52 @@ def wait(state_doc):
         logger.info("Did not find the {snapshot_date} snapshot of {database}".format(**state_doc))
         logger.info("Going to sleep.")
 
-@add_db_description
-def restore(state_doc, db_description=None):
-    if db_description is None:
+
+def restore(state_doc, rds_session):
+    tmp_db_description = get_database_description(
+        rds_session, state_doc["tmp_database"]
+    )
+    if tmp_db_description is None:
+        logger.info(
+            "Restoring snapshot of {database} to {tmp_database}".format(
+                **state_doc
+            )
+        )
         transition_state(state_doc, "restore")
         sn_ids = state_doc["database_sn_ids"]
         if isinstance(sn_ids, basestring):
             sn_ids = sn_ids.split(",")
-        restore_from_latest_snapshot(rds, state_doc["database"], sn_ids)
-    elif db_description["DBInstanceStatus"] == "available":
+        restore_from_latest_snapshot(rds_session, state_doc["database"], sn_ids)
+    elif tmp_db_description["DBInstanceStatus"] == "available":
         transition_state(state_doc, "modify")
-        modify(state_doc, db_description)
+        modify(state_doc, rds_session)
 
-@add_db_description
-def modify(state_doc, db_description=None):
+
+def modify(state_doc, rds_session):
+    logger.info(
+        "Modifying {tmp_database} master password and security groups".format(
+            **state_doc
+        )
+    )
     sg_ids = state_doc["database_sg_ids"]
     if isinstance(sg_ids, basestring):
         sg_ids = sg_ids.split(",")
     state_doc["tmp_password"] = modify_db_instance_for_verify(
-        rds, state_doc["tmp_database"], sg_ids,
+        rds_session, state_doc["tmp_database"], sg_ids,
     )
     transition_state(state_doc, "verify")
 
-@add_db_description
-def verify(state_doc, db_description=None):
-    if db_description["DBInstanceStatus"] == "available":
+
+def verify(state_doc, rds_session):
+    tmp_db_description = get_database_description(
+        rds_session, state_doc["tmp_database"]
+    )
+    if tmp_db_description["DBInstanceStatus"] == "available":
+        logger.info(
+            "Skipping verify of {tmp_database}, not implemented".format(
+                **state_doc
+            )
+        )
         #connection = connect_to_endpoint(db_description["endpoint"])
         #result = run_all_the_tests(connection, state_doc["verfication_checks"])
         #if result:
@@ -80,17 +96,29 @@ def verify(state_doc, db_description=None):
         #    transition_state(state_doc, "alarm")
         #    alarm(state_doc, "error")
         transition_state(state_doc, "cleanup")
-        cleanup(state_doc, db_description)
+        cleanup(state_doc, rds_session)
 
-@add_db_description
-def cleanup(state_doc, db_description=None):
-    if db_description is None:
+
+def cleanup(state_doc, rds_session):
+    tmp_db_description = get_database_description(
+        rds_session, state_doc["tmp_database"]
+    )
+    if tmp_db_description is None:
         # start waiting for tomorrows date.
         del state_doc["tmp_password"]
-        destroy_database_subnet_group(rds, state_doc["tmp_database"])
+        destroy_database_subnet_group(rds_session, state_doc["tmp_database"])
         transition_state(state_doc, "wait")
-    elif db_description["DBInstanceStatus"] == "available":
-        destroy_database(rds, state_doc["tmp_database"], db_description["DBInstanceArn"])
+    elif tmp_db_description["DBInstanceStatus"] == "available":
+        logger.info(
+            "cleaning / destroying {tmp_database}".format(
+                **state_doc
+            )
+        )
+        destroy_database(
+            rds_session,
+            state_doc["tmp_database"],
+            tmp_db_description["DBInstanceArn"]
+        )
 
 def alarm(state_doc):
     # trigger an alarm, maybe cloudwatch or something.
@@ -105,8 +133,14 @@ state_handlers = {
   "alarm": alarm,
 }
 
-def handler(config):
+def handler(event):
     """The main entrypoint called from CLI or when our AWS Lambda wakes up."""
-    state_doc = get_or_create_state_doc(config)
-    state_handler = state_handlers[current_state(state_doc)]
-    state_handler(state_doc)
+    state_doc = get_or_create_state_doc(event)
+    if state_doc is None:
+        logger.info("Ignoring unrelated RDS event: {}".format(event))
+    else:
+        state_handler = state_handlers[current_state(state_doc)]
+        rds_session =  boto3.client(
+            "rds", region_name=state_doc["snapshot_region"]
+        )
+        state_handler(state_doc, rds_session)

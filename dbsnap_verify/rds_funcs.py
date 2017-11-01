@@ -89,9 +89,9 @@ def restore_from_latest_snapshot(session, db_id, sn_ids):
     new_db_id = dbsnap_verify_db_id(db_id)
 
     session.create_db_subnet_group(
-      DBSubnetGroupName = new_db_id,
-      DBSubnetGroupDescription = new_db_id,
-      SubnetIds = sn_ids,
+        DBSubnetGroupName = new_db_id,
+        DBSubnetGroupDescription = new_db_id,
+        SubnetIds = sn_ids,
     )
 
     session.restore_db_instance_from_db_snapshot(

@@ -1,17 +1,16 @@
 DATE = $(shell date +%Y-%m-%d)
 
-test: build
-		. env/bin/activate
-		pip install -r requirements-dev.txt
-		py.test
+test: clean virtualenv
+		. env/bin/activate && python setup.py pytest
+
+virtualenv:
+		virtualenv ./env
 
 clean:
-		rm -rf ./env ./dist ./build
+		rm -rf ./env ./dist ./build ./dbsnap_verify.egg-info
 
-build:
-		virtualenv ./env
-		. env/bin/activate
-		python setup.py install
+build: clean virtualenv
+		. env/bin/activate && python setup.py install
 
 build-lambda: build
 		cp aws_lambda.py ./dist

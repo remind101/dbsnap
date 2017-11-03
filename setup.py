@@ -6,7 +6,7 @@ from setuptools import (
 
 setup( 
     name = 'dbsnap_verify',
-    version = '0.0.4',
+    version = '0.0.5',
     description = 'Tool for verifying AWS RDS snapshots.',
     keywords = 'aws rds snapshot tool infrastructure',
     long_description = open('README.rst').read(),
@@ -23,11 +23,13 @@ setup(
         'boto3',
     ],
     tests_require = [
+        'pytest',
         'nose',
         'mock',
         'funcsigs',
         'flake8',
     ],
+    setup_requires=['pytest-runner'],
     entry_points = {
       'console_scripts': [
         'dbsnap-verify = dbsnap_verify.__main__:main',

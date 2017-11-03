@@ -11,8 +11,7 @@ VALID_SNAPSHOT_TYPES = ["automated", "manual"]
 
 
 def generate_password(size=9, pool=None):
-    """
-    Return a system generated password.
+    """Return a system generated password.
     Args:
         size (int): The desired length of the password to generate (Default 9).
         pool (list): list of chars to choose from.
@@ -51,7 +50,24 @@ def get_available_snapshots(session, db_id, snapshot_type=None):
     return filter(lambda x: x["Status"] == "available", snapshots)
 
 
-def get_latest_snapshot(session, db_id):
+def get_latest_snapshot(session, db_id, snapshot_type=None):
+    """Returns the latest snapshot for a given database identifier.
+    Args:
+        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api connection
+            where the database is located.
+        db_id (str): The database instance identifier whose snapshots you
+            want to examine.
+    Returns:
+        dict: The snapshot description document for the latest snapshot.
+    """
+    snapshots = get_available_snapshots(session, db_id, snapshot_type)
+    if not snapshots:
+        raise ValueError("Unable to find any available snapshots for database "
+                         "id: %s" % db_id)
+    return snapshots[-1]
+
+
+def get_latest_snapshot_id(session, db_id, snapshot_type=None):
     """Returns the latest snapshot for a given database identifier.
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api connection
@@ -61,11 +77,9 @@ def get_latest_snapshot(session, db_id):
     Returns:
         str: The ID for the latest snapshot.
     """
-    snapshots = get_available_snapshots(session, db_id, "automated")
-    if not snapshots:
-        raise ValueError("Unable to find any available snapshots for database "
-                         "id: %s" % db_id)
-    return snapshots[-1]['DBSnapshotIdentifier']
+    return get_latest_snapshot(
+        session, db_id, snapshot_type
+    )['DBSnapshotIdentifier']
 
 
 def dbsnap_verify_db_id(db_id):
@@ -77,14 +91,14 @@ def dbsnap_verify_db_id(db_id):
 
 
 def restore_from_latest_snapshot(session, db_id, sn_ids):
-    """
+    """Restores a temp db instance from the latest snapshot.
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
             connection where the database is located.
         db_id (str): The database instance identifier whose snapshots you
             want to examine.
     """
-    latest_snapshot_id = get_latest_snapshot(session, db_id)
+    latest_snapshot_id = get_latest_snapshot_id(session, db_id)
 
     new_db_id = dbsnap_verify_db_id(db_id)
 
@@ -109,6 +123,7 @@ def restore_from_latest_snapshot(session, db_id, sn_ids):
 
 def get_database_description(session, db_id):
     """
+    Returns database description document or None.
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
             connection where the database is located.
@@ -125,8 +140,7 @@ def get_database_description(session, db_id):
 
 
 def modify_db_instance_for_verify(session, db_id, sg_ids):
-    """
-    Modify RDS DB Instance to allow connections.
+    """Modify RDS DB Instance to allow connections.
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
             connection where the database is located.
@@ -147,22 +161,29 @@ def modify_db_instance_for_verify(session, db_id, sg_ids):
 
 
 def make_tag_dict(tag_list):
-    """
-    Return a dictionary of existing tags.
+    """Returns a dictionary of existing tags.
     Args:
         tag_list (list): a list of tag dicts.
     Returns:
         dict: A dictionary where tag names are keys and tag values are values.
     """
-    tag_dict = {}
-    for tag in tag_list:
-        tag_dict[tag['Key']] = tag['Value']
-    return tag_dict
+    return {i["Key"]: i["Value"] for i in tag_list}
+
+
+def get_tags_for_rds_arn(session, rds_arn):
+    """Returns a dictionary of existing tags.
+    Args:
+        rds_arn (str): an RDS resource ARN.
+    Returns:
+        dict: A dictionary where tag names are keys and tag values are values.
+    """
+    return make_tag_dict(
+        session.list_tags_for_resource(ResourceName=rds_arn)["TagList"]
+    )
 
 
 def destroy_database(session, db_id, db_arn=None):
-    """
-    Destroy the RDS db instance.
+    """Destroy the RDS db instance.
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
             connection where the database is located.
@@ -172,9 +193,7 @@ def destroy_database(session, db_id, db_arn=None):
         description = get_database_description(session, db_id)
         db_arn = description["DBInstanceArn"]
 
-    tags = make_tag_dict(
-        session.list_tags_for_resource(ResourceName=db_arn)["TagList"]
-    )
+    tags = get_tags_for_rds_arn(session, rds_arn)
 
     if tags.get("dbsnap-verify", "false") != "true":
         raise Exception(
@@ -188,8 +207,7 @@ def destroy_database(session, db_id, db_arn=None):
 
 
 def destroy_database_subnet_group(session, db_id):
-    """
-    Destroy the RDS db instance subnet group.
+    """Destroy the RDS db instance subnet group.
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
             connection where the database is located.

@@ -15,8 +15,11 @@ from state_doc import (
 )
 
 from time_funcs import (
-    date_str_to_datetime,
-    today_date,
+    tomorrow_timestamp,
+    now_datetime,
+    timestamp_to_datetime,
+    datetime_to_date_str,
+    three_days_prior,
 )
 
 import boto3
@@ -29,17 +32,30 @@ logger.addHandler(logging.StreamHandler(stdout))
 
 
 def wait(state_doc, rds_session):
-    logger.info("Looking for the {snapshot_date} snapshot of {database}".format(**state_doc))
-    description = get_latest_snapshot(rds_session, state_doc["database"])
-    if description:
+    min_timestamp = state_doc["snapshot_minimum_timestamp"]
+    min_datetime = timestamp_to_datetime(min_timestamp)
+    logger.info("Looking for a snapshot of {} older then {}".format(
+        state_doc["database"],
+        datetime_to_date_str(min_datetime)
+    ))
+    snapshot_desc = get_latest_snapshot(rds_session, state_doc["database"])
+    if snapshot_desc["SnapshotCreateTime"] >= min_datetime:
+        # if the latest snapshot is older then the minimum, restore it.
         restore(state_doc, rds_session)
-    elif today_date() > date_str_to_datetime(state_doc["snapshot_date"]):
-        logger.warning("Alert! we never found the {snapshot_date} snapshot for {database}".format(**state_doc))
-        alarm("asdfasdfasdkfjnasdf naskdfn aksdjfn")
-    else:
+    elif min_datetime <= three_days_prior(now_datetime):
+        # continue wating for a new snapshot, to restore.
         transition_state(state_doc, "wait")
-        logger.info("Did not find the {snapshot_date} snapshot of {database}".format(**state_doc))
+        logger.info("Did not find a snapshot of {} older then {}".format(
+            state_doc["database"],
+            datetime_to_date_str(min_datetime)
+        ))
         logger.info("Going to sleep.")
+    else:
+        logger.warning("Alert! we never found a snapshot of {} older then {}".format(
+            state_doc["database"],
+            datetime_to_date_str(min_datetime)
+        ))
+        alarm("asdfasdfasdkfjnasdf naskdfn aksdjfn")
 
 
 def restore(state_doc, rds_session):
@@ -75,6 +91,10 @@ def modify(state_doc, rds_session):
         rds_session, state_doc["tmp_database"], sg_ids,
     )
     transition_state(state_doc, "verify")
+    # this is janky but the modify operation doesn't happen right away.
+    # this is temporary until I can find a better way.
+    from time import sleep
+    sleep(20)
 
 
 def verify(state_doc, rds_session):
@@ -105,7 +125,16 @@ def cleanup(state_doc, rds_session):
     )
     if tmp_db_description is None:
         # start waiting for tomorrows date.
+        logger.info(
+            "cleaning {tmp_database} subnet group and tmp_password".format(
+                **state_doc
+            )
+        )
         del state_doc["tmp_password"]
+        state_count_to_keep = 100
+        trim_index = len(state_doc["states"]) - state_count_to_keep
+        state_doc["states"] = state_doc["states"][trim_index:]
+        state_doc["snapshot_minimum_timestamp"] = tomorrow_timestamp()
         destroy_database_subnet_group(rds_session, state_doc["tmp_database"])
         transition_state(state_doc, "wait")
     elif tmp_db_description["DBInstanceStatus"] == "available":

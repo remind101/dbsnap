@@ -4,7 +4,7 @@ import mock
 
 from dbsnap_verify.rds_funcs import (
     get_available_snapshots,
-    get_latest_snapshot,
+    get_latest_snapshot_id,
     get_database_description,
 )
 
@@ -57,12 +57,12 @@ class TestRdsFuncs(unittest.TestCase):
         }
 
         with self.assertRaises(ValueError):
-            get_latest_snapshot(session, "my-db")
+            get_latest_snapshot_id(session, "my-db")
 
     def test_get_latest_snapshot(self):
         session = mock.MagicMock()
         session.describe_db_snapshots.return_value = self.snapshots
-        r = get_latest_snapshot(session, "my-db")
+        r = get_latest_snapshot_id(session, "my-db")
         self.assertEqual(r, "rds:snapshot3")
 
     def test_get_database_description(self):

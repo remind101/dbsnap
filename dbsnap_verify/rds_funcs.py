@@ -139,6 +139,22 @@ def get_database_description(session, db_id):
         return None
 
 
+def get_database_events(session, db_id, event_catagories=None, duration=60):
+    if not event_catagories:
+        event_catagories = []
+    return session.describe_events(
+        SourceIdentifier=db_id,
+        SourceType='db-instance',
+        EventCategories = event_catagories,
+        Duration = duration,
+    )['Events']
+
+
+def rds_event_messages(session, db_id, event_catagories=None, duration=60):
+    events = get_database_events(session, db_id, event_catagories, duration)
+    return [i['Message'] for i in events]
+
+
 def modify_db_instance_for_verify(session, db_id, sg_ids):
     """Modify RDS DB Instance to allow connections.
     Args:
@@ -193,7 +209,7 @@ def destroy_database(session, db_id, db_arn=None):
         description = get_database_description(session, db_id)
         db_arn = description["DBInstanceArn"]
 
-    tags = get_tags_for_rds_arn(session, rds_arn)
+    tags = get_tags_for_rds_arn(session, db_arn)
 
     if tags.get("dbsnap-verify", "false") != "true":
         raise Exception(

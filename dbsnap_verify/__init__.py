@@ -6,6 +6,7 @@ from rds_funcs import (
     dbsnap_verify_db_id,
     destroy_database,
     destroy_database_subnet_group,
+    rds_event_messages,
 )
 
 from state_doc import (
@@ -15,7 +16,7 @@ from state_doc import (
 )
 
 from time_funcs import (
-    today_timestamp,
+    tomorrow_timestamp,
     now_datetime,
     timestamp_to_datetime,
     datetime_to_date_str,
@@ -90,17 +91,6 @@ def modify(state_doc, rds_session):
     state_doc["tmp_password"] = modify_db_instance_for_verify(
         rds_session, state_doc["tmp_database"], sg_ids,
     )
-    # this is janky but the modify operation doesn't happen right away.
-    # this is temporary, the correct way to deal with this is to search
-    # rds config events for the temp database and make sure reset master
-    # occured before transitioning to "verify"
-    # rds_session.describe_events(
-    #    SourceType='db-instance',
-    #    SourceIdentifier='dbsnap-verify-tutorial-db-instance',
-    #    EventCategories=['configuration change']
-    # )
-    from time import sleep
-    sleep(10)
     transition_state(state_doc, "verify")
 
 
@@ -108,7 +98,11 @@ def verify(state_doc, rds_session):
     tmp_db_description = get_database_description(
         rds_session, state_doc["tmp_database"]
     )
-    if tmp_db_description["DBInstanceStatus"] == "available":
+    tmp_db_status = tmp_db_description["DBInstanceStatus"]
+    tmp_db_event_messages = rds_event_messages(
+        rds_session, state_doc["tmp_database"]
+    )
+    if 'Reset master credentials' in tmp_db_event_messages and tmp_db_status == "available":
         logger.info(
             "Skipping verify of {tmp_database}, not implemented".format(
                 **state_doc
@@ -141,7 +135,7 @@ def cleanup(state_doc, rds_session):
         state_count_to_keep = 100
         trim_index = len(state_doc["states"]) - state_count_to_keep
         state_doc["states"] = state_doc["states"][trim_index:]
-        state_doc["snapshot_minimum_timestamp"] = today_timestamp()
+        state_doc["snapshot_minimum_timestamp"] = tomorrow_timestamp()
         destroy_database_subnet_group(rds_session, state_doc["tmp_database"])
         transition_state(state_doc, "wait")
     elif tmp_db_description["DBInstanceStatus"] == "available":

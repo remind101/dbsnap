@@ -15,7 +15,7 @@ from state_doc import (
 )
 
 from time_funcs import (
-    tomorrow_timestamp,
+    today_timestamp,
     now_datetime,
     timestamp_to_datetime,
     datetime_to_date_str,
@@ -42,7 +42,7 @@ def wait(state_doc, rds_session):
     if snapshot_desc["SnapshotCreateTime"] >= min_datetime:
         # if the latest snapshot is older then the minimum, restore it.
         restore(state_doc, rds_session)
-    elif min_datetime <= three_days_prior(now_datetime):
+    elif min_datetime >= three_days_prior(now_datetime()):
         # continue wating for a new snapshot, to restore.
         transition_state(state_doc, "wait")
         logger.info("Did not find a snapshot of {} older then {}".format(
@@ -124,7 +124,7 @@ def cleanup(state_doc, rds_session):
         rds_session, state_doc["tmp_database"]
     )
     if tmp_db_description is None:
-        # start waiting for tomorrows date.
+        # start waiting for today's snapshot (which could appear tomorrow).
         logger.info(
             "cleaning {tmp_database} subnet group and tmp_password".format(
                 **state_doc
@@ -134,7 +134,7 @@ def cleanup(state_doc, rds_session):
         state_count_to_keep = 100
         trim_index = len(state_doc["states"]) - state_count_to_keep
         state_doc["states"] = state_doc["states"][trim_index:]
-        state_doc["snapshot_minimum_timestamp"] = tomorrow_timestamp()
+        state_doc["snapshot_minimum_timestamp"] = today_timestamp()
         destroy_database_subnet_group(rds_session, state_doc["tmp_database"])
         transition_state(state_doc, "wait")
     elif tmp_db_description["DBInstanceStatus"] == "available":

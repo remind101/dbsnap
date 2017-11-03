@@ -2,11 +2,13 @@ import time
 
 import datetime
 
+from dateutil.tz import tzutc
+
 def datetime_to_timestamp(dt):
     return time.mktime(dt.timetuple())
 
 def timestamp_to_datetime(timestamp):
-    return datetime.datetime.fromtimestamp(timestamp)
+    return datetime.datetime.utcfromtimestamp(timestamp).replace(tzinfo=tzutc())
 
 def now_timestamp():
     return time.time()
@@ -16,13 +18,19 @@ def now_datetime():
 
 def today_datetime():
     now_dt = now_datetime()
-    return datetime.datetime(now_dt.year, now_dt.month, now_dt.day)
+    return datetime.datetime(now_dt.year, now_dt.month, now_dt.day, tzinfo=tzutc())
 
 def tomorrow_datetime():
     return (today_datetime() + datetime.timedelta(days=1))
 
+def yesterday_datetime():
+    return (today_datetime() - datetime.timedelta(days=1))
+
 def today_timestamp():
     return datetime_to_timestamp(today_datetime())
+
+def yesterday_timestamp():
+    return datetime_to_timestamp(yesterday_datetime())
 
 def tomorrow_timestamp():
     return datetime_to_timestamp(tomorrow_datetime())

@@ -5,7 +5,7 @@ import json
 import boto3
 
 from time_funcs import (
-    today_timestamp,
+    yesterday_timestamp,
     now_timestamp,
 )
 from rds_funcs import dbsnap_verify_db_id
@@ -58,7 +58,7 @@ def download_state_doc(config):
 def create_state_doc(config):
     state_doc = config
     state_doc["states"] = []
-    state_doc["snapshot_minimum_timestamp"] = today_timestamp()
+    state_doc["snapshot_minimum_timestamp"] = yesterday_timestamp()
     state_doc["tmp_database"] = dbsnap_verify_db_id(state_doc["database"])
     return transition_state(state_doc, "wait")
 

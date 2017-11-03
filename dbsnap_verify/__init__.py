@@ -90,11 +90,18 @@ def modify(state_doc, rds_session):
     state_doc["tmp_password"] = modify_db_instance_for_verify(
         rds_session, state_doc["tmp_database"], sg_ids,
     )
-    transition_state(state_doc, "verify")
     # this is janky but the modify operation doesn't happen right away.
-    # this is temporary until I can find a better way.
+    # this is temporary, the correct way to deal with this is to search
+    # rds config events for the temp database and make sure reset master
+    # occured before transitioning to "verify"
+    # rds_session.describe_events(
+    #    SourceType='db-instance',
+    #    SourceIdentifier='dbsnap-verify-tutorial-db-instance',
+    #    EventCategories=['configuration change']
+    # )
     from time import sleep
-    sleep(20)
+    sleep(10)
+    transition_state(state_doc, "verify")
 
 
 def verify(state_doc, rds_session):

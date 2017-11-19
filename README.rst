@@ -10,11 +10,8 @@ This means it expects to be "chimed" every 15m or so using a mechanism like cron
 
 The program is a state machine, it changes behavior based on the current state.
 It will store execution state as a JSON document in a local file or in ``S3``.
-If you decide to store the state document in ``S3`` the executing role will need read and write access.
 
-The role will also need the ability to do most ``RDS`` actions.
-TODO: harden the list of ``RDS`` and put them here.
-
+.. contents::
 
 Install
 ===============
@@ -22,6 +19,9 @@ Install
 You may install this tool into your Python environment by running::
 
  python setup.py develop
+ 
+CLI Tool
+===============
 
 Verify install::
 
@@ -70,9 +70,43 @@ state_doc_bucket (string):
  The S3 bucket to store the state document.
  If you choose this, do not set ``state_doc_path``.
 
+IAM Permissions
+================
+
+If you decide to store the state document in ``S3`` the executing role will need read and write access.
+
+The role will also need the ability to do most ``RDS`` actions.
+TODO: harden the list of ``RDS`` and put them here.
+
+states
+================
+
+The following transitions will fire asynchronously and quit: ``wait``, ``restore``, ``modify``, ``clean``, ``alarm``.
+
+There is no true "end state", once ``clean`` we ``wait`` for the next day's snapshot.
+
+wait:
+ We are currently waiting for the next snapshot to appear.
+ 
+restore:
+ We are currently restoring a copy of the snapshot into a temporary RDS database instance.
+ 
+modify:
+ We are currently modifying the temporary RDS database settings to allow the script access.
+ 
+verify:
+ We are currently verifying the restore using the supplied checks. (not implemented)
+ 
+clean:
+ We are currently tearing down the temporary RDS database instance and anything else we created or modified.
+ 
+alarm:
+ Something went wrong we are going to scream about it.
+ 
+Each time this tool "wakes up" it uses the ``state_doc`` to remember where it left off.
 
 state_doc
-===============
+================
 
 The state machine uses a JSON ``state_doc`` to keep track of it's state and configuration.
 This ``state_doc`` may be stored in either a local file or ``S3``.
@@ -82,8 +116,8 @@ You do not need to create this document, the tool manages it automatically.
 An `example_state_doc.json <https://github.com/remind101/dbsnap-verify/blob/import/tests/fixtures/example_state_doc.json>`_ may be found here.
 
 
-State Machine
-===============
+State Machine Diagram
+====================================
 
 Here is a diagram of the state machine transitions and states.
 

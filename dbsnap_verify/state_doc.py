@@ -5,10 +5,17 @@ import json
 import boto3
 
 from time_funcs import (
-    yesterday_timestamp,
     now_timestamp,
+    add_days_to_datetime,
+    yesterday_datetime,
+    tomorrow_datetime,
+    datetime_to_timestamp,
 )
 from rds_funcs import dbsnap_verify_db_id
+
+DB_ID_PREFIX_LEN = 14
+
+# TODO: it feels like `state_doc` should be a dict-like class
 
 
 def current_state(state_doc):
@@ -55,12 +62,29 @@ def download_state_doc(config):
     return json.loads(state_doc_json)
 
 
+def _set_max_mix_timestamps(state_doc, dt1):
+    dt2 = add_days_to_datetime(
+        dt1, state_doc.get("snapshot_deadman_switch_days", 3)
+    )
+    state_doc["snapshot_minimum_timestamp"] = datetime_to_timestamp(dt1)
+    state_doc["snapshot_maximum_timestamp"] = datetime_to_timestamp(dt2)
+    return state_doc
+
+
 def create_state_doc(config):
     state_doc = config
-    state_doc["states"] = []
-    state_doc["snapshot_minimum_timestamp"] = yesterday_timestamp()
     state_doc["tmp_database"] = dbsnap_verify_db_id(state_doc["database"])
+    state_doc["states"] = []
+    state_doc = _set_max_mix_timestamps(state_doc, yesterday_datetime())
     return transition_state(state_doc, "wait")
+
+
+def clean_state_doc(state_doc, state_count_to_keep=100):
+    state_doc.pop("tmp_password", None)
+    trim_index = len(state_doc["states"]) - state_count_to_keep
+    state_doc["states"] = state_doc["states"][trim_index:]
+    state_doc = _set_max_mix_timestamps(state_doc, tomorrow_datetime())
+    return state_doc
 
 
 def get_state_doc_in_s3(config):
@@ -112,21 +136,24 @@ def transition_state(state_doc, new_state):
 
 def get_or_create_state_doc(config):
     if "database" not in config:
-        # try to get state_doc for a RDS event, intead of config event.
+        # try to get state_doc (or None) for a RDS event, intead of config event.
         try:
             event_message = json.loads(
                 config["Records"][0]["Sns"]["Message"]
             )
-            database_id = event_message["Source ID"][14:]
+            # strip "dbsnap-verify-" from tmp_database name.
+            database_id = event_message["Source ID"][DB_ID_PREFIX_LEN:]
             rds_event_message = event_message["Event Message"]
-            return get_state_doc_in_s3(
-                {
-                    "database": database_id,
-                    "rds_event_latest_message": rds_event_message,
-                }
-            )
         except KeyError:
-            pass
+            # something sent us an invalid event.
+            return None
+
+        return get_state_doc_in_s3(
+            {
+                "database": database_id,
+                "rds_event_latest_message": rds_event_message,
+            }
+        )
     else:
         persistence = state_doc_persistence(config)
         if persistence == "state_doc_path":

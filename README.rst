@@ -18,7 +18,7 @@ Install
 
 You may install this tool into your Python environment by running::
 
- python setup.py develop
+ make build
  
 CLI Tool
 ===============
@@ -53,14 +53,17 @@ An example `dbsnap-verify-config.json <https://github.com/remind101/dbsnap-verif
 database (string):
  The AWS RDS DB Identifier whose snapshot we should restore/verify.
 
-database_sg_ids (string):
+database_security_group_ids (string):
  A CSV of security group ids to add to the newly restored temporary database instance.
 
-database_sn_ids (string):
+database_subnet_ids (string):
  A CSV of subnet ids to create a database subnet group with.
 
 snapshot_region (string):
- The region to find the snapshot and restore/verify in.
+ The region to find the snapshot and restore/verify into.
+
+snapshot_deadman_switch_days (integer):
+ The amount of days to wait for snapshot before alarming. (default: 3)
 
 state_doc_path (string):
  The path to the local file to store the state document.
@@ -86,22 +89,22 @@ The following transitions will fire asynchronously and quit: ``wait``, ``restore
 There is no true "end state", once ``clean`` we ``wait`` for the next day's snapshot.
 
 wait:
- We are currently waiting for the next snapshot to appear.
+ currently waiting for the next snapshot to appear.
  
 restore:
- We are currently restoring a copy of the snapshot into a temporary RDS database instance.
+ currently restoring a copy of the snapshot into a temporary RDS database instance.
  
 modify:
- We are currently modifying the temporary RDS database settings to allow the script access.
+ currently modifying the temporary RDS database settings to allow the script access.
  
 verify:
- We are currently verifying the restore using the supplied checks. (not implemented)
+ currently verifying the restore using the supplied checks. (not implemented)
  
 clean:
- We are currently tearing down the temporary RDS database instance and anything else we created or modified.
+ currently tearing down the temporary RDS database instance and anything else we created or modified.
  
 alarm:
- Something went wrong we are going to scream about it.
+ something went wrong we are going to scream about it.
  
 Each time this tool "wakes up" it uses the ``state_doc`` to remember where it left off.
 

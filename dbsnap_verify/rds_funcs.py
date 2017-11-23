@@ -10,7 +10,7 @@ from string import (
 VALID_SNAPSHOT_TYPES = ["automated", "manual"]
 
 
-def generate_password(size=9, pool=None):
+def generate_password(size=9, pool=letters+digits):
     """Return a system generated password.
     Args:
         size (int): The desired length of the password to generate (Default 9).
@@ -19,8 +19,6 @@ def generate_password(size=9, pool=None):
     Returns:
         str: the raw password
     """
-    if pool == None:
-        pool = letters + digits
     return ''.join([choice(pool) for i in range(size)])
 
 

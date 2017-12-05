@@ -137,7 +137,7 @@ def get_database_description(session, db_id):
         return None
 
 
-def get_database_events(session, db_id, event_catagories=None, duration=60):
+def get_database_events(session, db_id, event_catagories=None, duration=1440):
     if not event_catagories:
         event_catagories = []
     return session.describe_events(
@@ -148,7 +148,7 @@ def get_database_events(session, db_id, event_catagories=None, duration=60):
     )['Events']
 
 
-def rds_event_messages(session, db_id, event_catagories=None, duration=60):
+def rds_event_messages(session, db_id, event_catagories=None, duration=1440):
     events = get_database_events(session, db_id, event_catagories, duration)
     return [i['Message'] for i in events]
 

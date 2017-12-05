@@ -101,6 +101,7 @@ def modify(state_doc, rds_session):
         rds_session, state_doc["tmp_database"], security_group_ids,
     )
     transition_state(state_doc, "verify")
+    verify(state_doc, rds_session)
 
 
 def verify(state_doc, rds_session):

@@ -17,7 +17,6 @@ from state_doc import (
 )
 
 from time_funcs import (
-    tomorrow_timestamp,
     now_datetime,
     timestamp_to_datetime,
     datetime_to_date_str,
@@ -148,7 +147,7 @@ def cleanup(state_doc, rds_session):
         destroy_database_subnet_group(rds_session, state_doc["tmp_database"])
         # remove tmp_password, clear old states, wait for next snapshot.
         state_doc = clean_state_doc(state_doc)
-        # start next snapshot (which could appear tomorrow).
+        # wait for next snapshot (which could appear tomorrow).
         transition_state(state_doc, "wait")
     elif tmp_db_description["DBInstanceStatus"] == "available":
         logger.info(

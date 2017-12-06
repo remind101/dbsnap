@@ -62,7 +62,11 @@ database_subnet_ids (string):
 snapshot_region (string):
  The region to find the snapshot and restore/verify into.
 
+snapshot_verify_frequency_days (integer):
+ Defines the start of the snapshot window. (default: 1)
+
 snapshot_deadman_switch_days (integer):
+ Defines the end of the snapshot window.
  The amount of days to wait for snapshot before alarming. (default: 3)
 
 state_doc_path (string):

@@ -6,9 +6,8 @@ import boto3
 
 from time_funcs import (
     now_timestamp,
+    today_datetime,
     add_days_to_datetime,
-    yesterday_datetime,
-    tomorrow_datetime,
     datetime_to_timestamp,
 )
 from rds_funcs import dbsnap_verify_db_id
@@ -62,7 +61,17 @@ def download_state_doc(config):
     return json.loads(state_doc_json)
 
 
-def _set_max_mix_timestamps(state_doc, dt1):
+def _set_max_mix_timestamps(state_doc):
+    # by default wait for today/tomorrow's database snapshot.
+    # To change window start adjust frequency.
+    dt1 = today_datetime()
+    if "snapshot_minimum_timestamp" in state_doc:
+        dt1 = add_days_to_datetime(
+            dt1, state_doc.get("snapshot_verify_frequency_days", 1)
+        )
+
+    # by default, wait for 3 days before alarming if snapshot not found.
+    # To change window end adjust deadman_switch.
     dt2 = add_days_to_datetime(
         dt1, state_doc.get("snapshot_deadman_switch_days", 3)
     )
@@ -75,7 +84,7 @@ def create_state_doc(config):
     state_doc = config
     state_doc["tmp_database"] = dbsnap_verify_db_id(state_doc["database"])
     state_doc["states"] = []
-    state_doc = _set_max_mix_timestamps(state_doc, yesterday_datetime())
+    state_doc = _set_max_mix_timestamps(state_doc)
     return transition_state(state_doc, "wait")
 
 
@@ -83,7 +92,7 @@ def clean_state_doc(state_doc, state_count_to_keep=100):
     state_doc.pop("tmp_password", None)
     trim_index = len(state_doc["states"]) - state_count_to_keep
     state_doc["states"] = state_doc["states"][trim_index:]
-    state_doc = _set_max_mix_timestamps(state_doc, tomorrow_datetime())
+    state_doc = _set_max_mix_timestamps(state_doc)
     return state_doc
 
 

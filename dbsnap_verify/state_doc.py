@@ -61,12 +61,12 @@ def download_state_doc(config):
     return json.loads(state_doc_json)
 
 
-def _set_max_mix_timestamps(state_doc):
+def _set_max_min_timestamps(state_doc):
     # by default wait for today/tomorrow's database snapshot.
     # To change window start adjust frequency.
     dt1 = today_datetime()
     if "snapshot_minimum_timestamp" in state_doc:
-        dt1 = add_days_to_datetime(
+        dt1 = subtract_days_from_datetime(
             dt1, state_doc.get("snapshot_verify_frequency_days", 1)
         )
 
@@ -84,7 +84,7 @@ def create_state_doc(config):
     state_doc = config
     state_doc["tmp_database"] = dbsnap_verify_db_id(state_doc["database"])
     state_doc["states"] = []
-    state_doc = _set_max_mix_timestamps(state_doc)
+    state_doc = _set_max_min_timestamps(state_doc)
     return transition_state(state_doc, "wait")
 
 

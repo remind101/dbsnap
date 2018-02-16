@@ -104,6 +104,10 @@ def restore_from_latest_snapshot(session, db_id, sn_ids):
         DBSubnetGroupName = new_db_id,
         DBSubnetGroupDescription = new_db_id,
         SubnetIds = sn_ids,
+        Tags=[
+            {"Key" : "Name", "Value" : new_db_id},
+            {"Key" : "dbsnap-verify", "Value" : "true"},
+        ],
     )
 
     session.restore_db_instance_from_db_snapshot(

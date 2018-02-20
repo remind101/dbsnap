@@ -64,11 +64,10 @@ def download_state_doc(config):
 def _set_max_min_timestamps(state_doc):
     # by default wait for today/tomorrow's database snapshot.
     # To change window start adjust frequency.
-    dt1 = today_datetime()
-    if "snapshot_minimum_timestamp" in state_doc:
-        dt1 = subtract_days_from_datetime(
-            dt1, state_doc.get("snapshot_verify_frequency_days", 1)
-        )
+    today = today_datetime()
+    dt1 = subtract_days_from_datetime(
+        today, state_doc.get("snapshot_verify_frequency_days", 1)
+    )
 
     # by default, wait for 3 days before alarming if snapshot not found.
     # To change window end adjust deadman_switch.

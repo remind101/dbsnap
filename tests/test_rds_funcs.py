@@ -9,7 +9,7 @@ from dbsnap_verify.rds_funcs import (
 )
 
 import boto3
-rds = boto3.client("rds")
+rds = boto3.client("rds", region_name="us-east-1")
 
 
 class TestRdsFuncs(unittest.TestCase):

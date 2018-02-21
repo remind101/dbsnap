@@ -21,6 +21,7 @@ setup(
 
     install_requires = [
         'boto3',
+        'botocore>=1.6.0',
     ],
     tests_require = [
         'nose',

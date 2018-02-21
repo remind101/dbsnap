@@ -2,20 +2,19 @@ from os import environ
 
 import json
 
+import time
+
 import boto3
 
-from .time_funcs import (
-    now_timestamp,
-    today_datetime,
-    add_days_to_datetime,
-    subtract_days_from_datetime,
-    datetime_to_timestamp,
-)
 from .rds_funcs import dbsnap_verify_db_id
 
 DB_ID_PREFIX_LEN = 14
 
 # TODO: it feels like `state_doc` should be a dict-like class
+
+
+def now_timestamp():
+    return time.time()
 
 
 def current_state(state_doc):
@@ -62,37 +61,18 @@ def download_state_doc(config):
     return json.loads(state_doc_json)
 
 
-def _set_max_min_timestamps(state_doc):
-    # by default wait for today/tomorrow's database snapshot.
-    # To change window start adjust frequency.
-    today = today_datetime()
-    dt1 = subtract_days_from_datetime(
-        today, state_doc.get("snapshot_verify_frequency_days", 1)
-    )
-
-    # by default, wait for 3 days before alarming if snapshot not found.
-    # To change window end adjust deadman_switch.
-    dt2 = add_days_to_datetime(
-        dt1, state_doc.get("snapshot_deadman_switch_days", 3)
-    )
-    state_doc["snapshot_minimum_timestamp"] = datetime_to_timestamp(dt1)
-    state_doc["snapshot_maximum_timestamp"] = datetime_to_timestamp(dt2)
-    return state_doc
-
-
 def create_state_doc(config):
     state_doc = config
     state_doc["tmp_database"] = dbsnap_verify_db_id(state_doc["database"])
     state_doc["states"] = []
-    state_doc = _set_max_min_timestamps(state_doc)
     return transition_state(state_doc, "wait")
 
 
 def clean_state_doc(state_doc, state_count_to_keep=100):
     state_doc.pop("tmp_password", None)
+    state_doc["snapshot_verified"] = state_doc.pop("snapshot_verifying", None)
     trim_index = len(state_doc["states"]) - state_count_to_keep
     state_doc["states"] = state_doc["states"][trim_index:]
-    state_doc = _set_max_mix_timestamps(state_doc)
     return state_doc
 
 

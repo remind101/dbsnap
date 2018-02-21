@@ -33,7 +33,5 @@
       "state": "wait"
     }
   ],
-  "snapshot_minimum_timestamp": 1510358400.0,
-  "snapshot_deadman_switch_days": 3,
   "snapshot_region": "us-east-1"
 }

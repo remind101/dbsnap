@@ -16,51 +16,44 @@ from .state_doc import (
     clean_state_doc,
 )
 
-from .time_funcs import (
-    now_datetime,
-    timestamp_to_datetime,
-    datetime_to_date_str,
-    add_days_to_datetime,
-)
-
 import boto3
+
+# retry 3 times on errors.
+from botocore.config import Config
+BOTO3_CONFIG = Config(retries={"max_attempts":3})
 
 import logging
 logger = logging.getLogger(__name__)
 
+try:
+    basestring
+except NameError:
+    basestring = str
+
 
 def wait(state_doc, rds_session):
     """wait: currently waiting for the next snapshot to appear."""
-    min_timestamp = state_doc["snapshot_minimum_timestamp"]
-    min_datetime = timestamp_to_datetime(min_timestamp)
-    max_datetime = add_days_to_datetime(min_datetime, 3)
+    verified_snapshot_id = state_doc.get("snapshot_verified", "any snapshot")
     logger.info(
-        "Looking for a snapshot of %s older then %s",
+        "Looking for a snapshot of %s (newer then %s)",
         state_doc["database"],
-        datetime_to_date_str(min_datetime)
+        verified_snapshot_id,
     )
     snapshot_desc = get_latest_snapshot(rds_session, state_doc["database"])
-    if snapshot_desc["SnapshotCreateTime"] >= min_datetime:
+    if snapshot_desc["DBSnapshotIdentifier"] != verified_snapshot_id:
         # if the latest snapshot is older then the minimum, restore it.
+        state_doc["snapshot_verifying"] = snapshot_desc["DBSnapshotIdentifier"]
         transition_state(state_doc, "restore")
         restore(state_doc, rds_session)
-    elif now_datetime() < max_datetime:
-        # continue wating for a new snapshot, to restore.
+    else:
+        # continue waiting for a new snapshot to restore.
         transition_state(state_doc, "wait")
         logger.info(
-            "Did not find a snapshot of %s older then %s",
+            "Did not find a snapshot of %s (newer then %s)",
             state_doc["database"],
-            datetime_to_date_str(min_datetime)
+            verified_snapshot_id,
         )
         logger.info("Going to sleep.")
-    else:
-        # the deadman switch was triggered, we didn't get a new snapshot!
-        logger.warning(
-            "Alert! we never found a snapshot of %s older then %s",
-            state_doc["database"],
-            datetime_to_date_str(min_datetime)
-        )
-        # TODO: call alarm state.
 
 
 def restore(state_doc, rds_session):
@@ -187,7 +180,9 @@ def handler(event):
         logger.info("Ignoring unrelated RDS event: %s", event)
     else:
         state_handler = state_handlers[current_state(state_doc)]
-        rds_session =  boto3.client(
-            "rds", region_name=state_doc["snapshot_region"]
+        rds_session = boto3.client(
+            "rds",
+            region_name=state_doc["snapshot_region"],
+            config=BOTO3_CONFIG,
         )
         state_handler(state_doc, rds_session)

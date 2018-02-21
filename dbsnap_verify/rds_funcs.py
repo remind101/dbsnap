@@ -90,17 +90,29 @@ def dbsnap_verify_db_id(db_id):
     return "dbsnap-verify-{}".format(db_id)
 
 
-def restore_from_latest_snapshot(session, db_id, sn_ids):
-    """Restores a temp db instance from the latest snapshot.
+def get_database_subnet_group_description(session, db_id):
+    """
+    Returns database subnet_group description document or None.
     Args:
         session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
             connection where the database is located.
-        db_id (str): The database instance identifier whose snapshots you
-            want to examine.
+        db_id (str): The RDS database instance identifier.
+    Returns:
+        dictionary: description of RDS database instance
     """
-    latest_snapshot_id = get_latest_snapshot_id(session, db_id)
+    try:
+        return session.describe_db_subnet_groups(
+            DBSubnetGroupName=db_id
+        )['DBSubnetGroups'][0]
+    except session.exceptions.DBSubnetGroupNotFoundFault:
+        return None
 
+
+def safer_create_database_subnet_group(session, db_id, sn_ids):
     new_db_id = dbsnap_verify_db_id(db_id)
+    
+    if get_database_subnet_group_description(session, new_db_id):
+        destroy_database_subnet_group(session, new_db_id)
 
     session.create_db_subnet_group(
         DBSubnetGroupName = new_db_id,
@@ -112,6 +124,20 @@ def restore_from_latest_snapshot(session, db_id, sn_ids):
         ],
     )
 
+
+def restore_from_latest_snapshot(session, db_id, sn_ids):
+    """Restores a temp db instance from the latest snapshot.
+    Args:
+        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
+            connection where the database is located.
+        db_id (str): The database instance identifier whose snapshots you
+            want to examine.
+    """
+    latest_snapshot_id = get_latest_snapshot_id(session, db_id)
+
+    safer_create_database_subnet_group(session, db_id, sn_ids)
+
+    new_db_id = dbsnap_verify_db_id(db_id)
     session.restore_db_instance_from_db_snapshot(
         DBInstanceIdentifier=new_db_id,
         DBSubnetGroupName=new_db_id,
@@ -233,6 +259,9 @@ def destroy_database_subnet_group(session, db_id):
             connection where the database is located.
         db_id (str): The RDS database instance subnet identifier to destroy.
     """
-    session.delete_db_subnet_group(
-        DBSubnetGroupName=db_id,
-    )
+    if get_database_subnet_group_description(session, db_id) is not None:
+        session.delete_db_subnet_group(
+            DBSubnetGroupName=db_id,
+        )
+
+

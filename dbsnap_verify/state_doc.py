@@ -8,6 +8,7 @@ from time_funcs import (
     now_timestamp,
     today_datetime,
     add_days_to_datetime,
+    subtract_days_from_datetime,
     datetime_to_timestamp,
 )
 from rds_funcs import dbsnap_verify_db_id

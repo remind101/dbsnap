@@ -1,4 +1,4 @@
-from rds_funcs import (
+from .rds_funcs import (
     get_latest_snapshot,
     get_database_description,
     restore_from_latest_snapshot,
@@ -9,14 +9,14 @@ from rds_funcs import (
     rds_event_messages,
 )
 
-from state_doc import (
+from .state_doc import (
     current_state,
     transition_state,
     get_or_create_state_doc,
     clean_state_doc,
 )
 
-from time_funcs import (
+from .time_funcs import (
     now_datetime,
     timestamp_to_datetime,
     datetime_to_date_str,

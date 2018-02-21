@@ -2,10 +2,12 @@ from operator import itemgetter
 
 from random import choice
 
-from string import (
-    letters,
-    digits,
-)
+from string import digits
+
+try:
+    from string import letters
+except ImportError:
+    from string import ascii_letters as letters
 
 VALID_SNAPSHOT_TYPES = ["automated", "manual"]
 
@@ -45,7 +47,7 @@ def get_available_snapshots(session, db_id, snapshot_type=None):
     r = session.describe_db_snapshots(**args)
     snapshots = r['DBSnapshots']
     snapshots.sort(key=itemgetter("SnapshotCreateTime"))
-    return filter(lambda x: x["Status"] == "available", snapshots)
+    return list(filter(lambda x: x["Status"] == "available", snapshots))
 
 
 def get_latest_snapshot(session, db_id, snapshot_type=None):

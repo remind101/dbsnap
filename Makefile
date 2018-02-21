@@ -17,7 +17,7 @@ build: clean virtualenv
 build-lambda: build
 	    mkdir ./artifacts
 		cp aws_lambda.py ./dist
-		cp -rf env/lib/python2.7/site-packages/* ./dist
+		cp -rf env/lib/python*/site-packages/* ./dist
 		cd ./dist && zip -r "../artifacts/lambda-dbsnap-verify-$(COMMIT_HASH).zip" .
 
 ### Python3 ###
@@ -34,5 +34,5 @@ build3: clean venv
 build-lambda3: build3
 	    mkdir ./artifacts
 		cp aws_lambda.py ./dist
-		cp -rf env/lib/python2.7/site-packages/* ./dist
+		cp -rf env/lib/python*/site-packages/* ./dist
 		cd ./dist && zip -r "../artifacts/lambda-dbsnap-verify-$(COMMIT_HASH).zip" .

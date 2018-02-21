@@ -34,5 +34,4 @@ jobs:
           command: make test3
 
       - store_artifacts:
-          path: ./artifacts
-          destination: artifacts
+          path: ~/repo/artifacts

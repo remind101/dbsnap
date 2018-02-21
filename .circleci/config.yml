@@ -22,7 +22,7 @@ jobs:
 
       - run:
           name: install dependencies
-          command: make build-lambda
+          command: make build-lambda3
 
       # run tests!
       # this example uses Django's built-in test-runner
@@ -31,7 +31,7 @@ jobs:
       # https://nose.readthedocs.io
       - run:
           name: run tests
-          command: make test
+          command: make test3
 
       - store_artifacts:
           path: ~/repo/artifacts

@@ -23,11 +23,11 @@ setup(
         'boto3',
     ],
     tests_require = [
-        'pytest',
         'nose',
         'mock',
         'funcsigs',
         'flake8',
+        'pytest',
     ],
     setup_requires=['pytest-runner'],
     entry_points = {

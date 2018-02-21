@@ -94,7 +94,7 @@ def modify(state_doc, rds_session):
         state_doc["tmp_database"]
     )
     security_group_ids = state_doc["database_security_group_ids"]
-    if isinstance(sg_ids, basestring):
+    if isinstance(security_group_ids, basestring):
         security_group_ids = security_group_ids.split(",")
     state_doc["tmp_password"] = modify_db_instance_for_verify(
         rds_session, state_doc["tmp_database"], security_group_ids,

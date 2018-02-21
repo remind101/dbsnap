@@ -76,7 +76,7 @@ def restore(state_doc, rds_session):
             state_doc["tmp_database"]
         )
         subnet_ids = state_doc["database_subnet_ids"]
-        if isinstance(sn_ids, basestring):
+        if isinstance(subnet_ids, basestring):
             subnet_ids = subnet_ids.split(",")
         restore_from_latest_snapshot(
             rds_session, state_doc["database"], subnet_ids

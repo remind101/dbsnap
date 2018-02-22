@@ -16,10 +16,11 @@ It will store execution state as a JSON document in a local file or in ``S3``.
 Install
 ===============
 
-You may install this tool into your Python environment by running::
+You may install this tool by running::
 
  make build
  
+
 CLI Tool
 ===============
 
@@ -82,7 +83,7 @@ The ``SNS`` and ``S3`` permissions are optional and only useful if you choose to
 states
 ================
 
-The following transitions will fire asynchronously and quit: ``wait``, ``restore``, ``modify``, ``clean``, ``alarm``.
+The following transitions will fire asynchronously and quit: ``wait``, ``restore``, ``modify``, ``cleanup``, ``alarm``.
 
 There is no true "end state", once ``clean`` we ``wait`` for the next day's snapshot.
 
@@ -98,7 +99,7 @@ modify:
 verify:
  currently verifying the restore using the supplied checks. (not implemented)
  
-clean:
+cleanup:
  currently tearing down the temporary RDS database instance and anything else we created or modified.
  
 alarm:

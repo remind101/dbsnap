@@ -3,7 +3,7 @@ COMMIT_HASH = $(shell git log -n 1 --pretty=format:"%H")
 clean:
 		rm -rf ./env ./dist ./build ./artifacts ./dbsnap_verify.egg-info
 
-### Python3 ###
+### Python2 ###
 
 test: clean virtualenv
 		. env/bin/activate && python setup.py pytest

@@ -3,7 +3,6 @@ from .rds_funcs import (
     get_database_description,
     restore_from_latest_snapshot,
     modify_db_instance_for_verify,
-    dbsnap_verify_db_id,
     destroy_database,
     destroy_database_subnet_group,
     rds_event_messages,

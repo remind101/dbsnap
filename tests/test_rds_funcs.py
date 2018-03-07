@@ -6,6 +6,9 @@ from dbsnap_verify.rds_funcs import (
     get_available_snapshots,
     get_latest_snapshot_id,
     get_database_description,
+    destroy_database,
+    SAFETY_TAG_KEY,
+    SAFETY_TAG_VAL,
 )
 
 import boto3
@@ -77,3 +80,39 @@ class TestRdsFuncs(unittest.TestCase):
         session.describe_db_instances.side_effect = rds.exceptions.DBInstanceNotFoundFault({}, '')
         r = get_database_description(session, "instanceX")
         self.assertEqual(r, None)
+
+    def test_destroy_database_missing_safety_tag(self):
+        session = mock.MagicMock()
+        session.list_tags_for_resource.return_value = {
+            "TagList" : [
+                { "Key" : "irrelevant", "Value" : "1" }
+            ]
+        }
+        with self.assertRaises(Exception):
+            r = destroy_database(
+                session, db_id="my-db" , db_arn="arn:rds:1234"
+            )
+
+    def test_destroy_database_incorrect_safety_tag_value(self):
+        session = mock.MagicMock()
+        session.list_tags_for_resource.return_value = {
+            "TagList" : [
+                { "Key" : SAFETY_TAG_KEY, "Value" : "1" }
+            ]
+        }
+        with self.assertRaises(Exception):
+            r = destroy_database(
+                session, db_id="my-db" , db_arn="arn:rds:1234"
+            )
+
+    def test_destroy_database(self):
+        session = mock.MagicMock()
+        session.list_tags_for_resource.return_value = {
+            "TagList" : [
+                { "Key" : SAFETY_TAG_KEY, "Value" : SAFETY_TAG_VAL }
+            ]
+        }
+        r = destroy_database(
+            session, db_id="my-db" , db_arn="arn:rds:1234"
+        )
+

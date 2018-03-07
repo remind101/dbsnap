@@ -11,6 +11,9 @@ except ImportError:
 
 VALID_SNAPSHOT_TYPES = ["automated", "manual"]
 
+SAFETY_TAG_KEY = "dbsnap-verify"
+SAFETY_TAG_VAL = "true"
+
 
 def generate_password(size=9, pool=letters+digits):
     """Return a system generated password.
@@ -120,7 +123,7 @@ def safer_create_database_subnet_group(session, db_id, sn_ids):
         SubnetIds = sn_ids,
         Tags=[
             {"Key" : "Name", "Value" : new_db_id},
-            {"Key" : "dbsnap-verify", "Value" : "true"},
+            {"Key" : SAFETY_TAG_KEY, "Value" : SAFETY_TAG_VAL},
         ],
     )
 
@@ -146,7 +149,7 @@ def restore_from_latest_snapshot(session, db_id, sn_ids):
         MultiAZ=False,
         Tags=[
             {"Key" : "Name", "Value" : new_db_id},
-            {"Key" : "dbsnap-verify", "Value" : "true"},
+            {"Key" : SAFETY_TAG_KEY, "Value" : SAFETY_TAG_VAL},
         ],
     )
 
@@ -241,9 +244,12 @@ def destroy_database(session, db_id, db_arn=None):
 
     tags = get_tags_for_rds_arn(session, db_arn)
 
-    if tags.get("dbsnap-verify", "false") != "true":
+    if tags.get(SAFETY_TAG_KEY, "false") != SAFETY_TAG_VAL:
         raise Exception(
-            "sheepishly refusing to destroy {}, missing `dbsnap-verify` tag"
+            "sheepishly refusing to destroy {}, missing `{}` tag".format(
+                db_id,
+                SAFETY_TAG_KEY
+            )
         )
 
     session.delete_db_instance(

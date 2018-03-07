@@ -85,6 +85,16 @@ class StateDoc(DocToObject):
             return self.states[-1]["state"]
 
     @property
+    def valid_transitions(self):
+        """You may overload this property."""
+        return self.transition_map.get(self.current_state, [])
+
+    @property
+    def transition_map(self):
+        """You may overload this property."""
+        return {}
+
+    @property
     def persistence(self):
         """str: "state_doc_bucket" or "state_doc_path" or raises exception."""
         if self.state_doc_bucket_name and self.state_doc_file_path:
@@ -126,8 +136,21 @@ class StateDoc(DocToObject):
         with open(self.state_doc_file_path, 'r') as json_file:
             return json_file.read()
 
-    def transition_state(self, new_state):
+    def is_valid_transition(self, new_state):
+        return new_state in self.valid_transitions
+
+    def transition_state(self, new_state, validate=True):
         """Change the state of the StateDoc and save to persistence."""
+        if validate and self.transition_map:
+            if self.is_valid_transition(new_state) == False:
+                raise Exception(
+                    """
+                    Invalid state transition from {} -> {}.
+                    Valid transitions are {}.
+                    """.format(
+                        self.current_state, new_state, self.valid_transitions
+                    )
+                )
         self.states.append(
             {"state" : new_state, "timestamp" : now_timestamp()}
         )
@@ -243,6 +266,17 @@ class DbsnapVerifyStateDoc(StateDoc):
     def security_group_ids(self):
         return self._csv_to_list(self.database_security_group_ids)
 
+    @property
+    def transition_map(self):
+        return {
+            "wait" : ["restore", "alarm"],
+            "restore" : ["modify", "alarm"],
+            "modify" : ["verify", "alarm"],
+            "verify" : ["cleanup", "alarm"],
+            "cleanup" : ["wait", "alarm"],
+            "alarm" : ["cleanup", "alarm"],
+        }
+
 
 def create_dbsnap_verify_state_doc(
         database,
@@ -258,7 +292,7 @@ def create_dbsnap_verify_state_doc(
         snapshot_region=snapshot_region,
         **kwargs
     )
-    state_doc.transition_state("wait")
+    state_doc.transition_state("wait", validate=False)
     return state_doc
 
 

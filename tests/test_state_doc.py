@@ -129,6 +129,7 @@ class TestStateDoc(unittest.TestCase):
         state_doc.load()
         self.assertEqual(len(self.state_doc.states), 2)
 
+
 class TestDictDbsnapVerifyStateDoc(unittest.TestCase):
 
     def setUp(self):
@@ -182,4 +183,52 @@ class TestDictDbsnapVerifyStateDoc(unittest.TestCase):
         self.assertEqual(len(self.state_doc.states), 100)
         self.assertEqual(self.state_doc.tmp_password, None)
 
+    @mock.patch(
+        'dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3',
+        mock_none
+    )
+    def test_valid_transitions(self):
+        self.state_doc.transition_state("wait", validate=False)
+        self.state_doc.transition_state("restore")
+        self.state_doc.transition_state("modify")
+        self.state_doc.transition_state("verify")
+        self.state_doc.transition_state("cleanup")
+        self.state_doc.transition_state("wait")
+        self.state_doc.transition_state("restore")
+        self.state_doc.transition_state("modify")
+        self.state_doc.transition_state("verify")
+        self.state_doc.transition_state("cleanup")
+        self.state_doc.transition_state("wait")
+        self.state_doc.transition_state("restore")
+        self.state_doc.transition_state("modify")
+        self.state_doc.transition_state("verify")
+        self.state_doc.transition_state("alarm")
+        self.state_doc.transition_state("cleanup")
+        self.state_doc.transition_state("wait")
+        self.state_doc.transition_state("restore")
+        self.state_doc.transition_state("modify")
+        self.state_doc.transition_state("verify")
+        self.state_doc.transition_state("cleanup")
+        self.state_doc.transition_state("wait")
 
+    @mock.patch(
+        'dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3',
+        mock_none
+    )
+    def test_invalid_transitions(self):
+        with self.assertRaises(Exception):
+            self.state_doc.transition_state("wait")
+        self.state_doc.transition_state("wait", validate=False)
+        with self.assertRaises(Exception):
+            self.state_doc.transition_state("modify")
+        self.state_doc.transition_state("restore")
+        with self.assertRaises(Exception):
+            self.state_doc.transition_state("verify")
+        self.state_doc.transition_state("modify")
+        self.state_doc.transition_state("verify")
+        with self.assertRaises(Exception):
+            self.state_doc.transition_state("wait")
+        self.state_doc.transition_state("cleanup")
+        self.state_doc.transition_state("wait")
+        with self.assertRaises(Exception):
+            self.state_doc.transition_state("wait")

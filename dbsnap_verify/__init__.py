@@ -37,7 +37,6 @@ def wait(state_doc, rds_session):
         state_doc.transition_state("restore")
         restore(state_doc, rds_session)
     else:
-        state_doc.transition_state("wait")
         logger.info(
             "Did not find a snapshot of %s (newer than %s)",
             state_doc.database,

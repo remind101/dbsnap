@@ -244,7 +244,7 @@ def destroy_database(session, db_id, db_arn=None):
 
     tags = get_tags_for_rds_arn(session, db_arn)
 
-    if tags.get(SAFETY_TAG_KEY, "false") != SAFETY_TAG_VAL:
+    if tags.get(SAFETY_TAG_KEY) != SAFETY_TAG_VAL:
         raise Exception(
             "sheepishly refusing to destroy {}, missing `{}` tag".format(
                 db_id,

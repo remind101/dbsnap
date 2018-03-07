@@ -86,7 +86,6 @@ class StateDoc(DocToObject):
 
     @property
     def valid_transitions(self):
-        """You may overload this property."""
         return self.transition_map.get(self.current_state, [])
 
     @property

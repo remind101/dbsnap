@@ -1,0 +1,36 @@
+{
+  "database": "test-db-instance",
+  "database_subnet_ids": "subnet-32220000,subnet-df7d0000,subnet-b39e0000,subnet-40040000",
+  "database_security_group_ids": "sg-33de0000",
+  "states": [
+    {
+      "timestamp": 1510298703.585208,
+      "state": "wait"
+    },
+    {
+      "timestamp": 1510298704.727762,
+      "state": "restore"
+    },
+    {
+      "timestamp": 1510320312.220386,
+      "state": "modify"
+    },
+    {
+      "timestamp": 1510320313.117139,
+      "state": "verify"
+    },
+    {
+      "timestamp": 1510320923.011164,
+      "state": "cleanup"
+    },
+    {
+      "timestamp": 1510321406.567858,
+      "state": "wait"
+    },
+    {
+      "timestamp": 1510321407.497513,
+      "state": "wait"
+    }
+  ],
+  "snapshot_region": "us-east-1"
+}

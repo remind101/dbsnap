@@ -12,6 +12,8 @@ from .rds_funcs import (
 
 from .state_doc import get_or_create_state_doc
 
+from .datadog_output import datadog_lambda_check_output
+
 import boto3
 
 # retry 3 times on errors.
@@ -21,6 +23,13 @@ BOTO3_CONFIG = Config(retries={"max_attempts":3})
 import logging
 logger = logging.getLogger(__name__)
 
+
+def dbsnap_verify_datadog_output(state_doc, alarm_status="OK"):
+    return datadog_lambda_check_output(
+        metric_name="dbsnap-verify.status",
+        metric_value=alarm_status,
+        metric_tags={"database":state_doc.database}
+    )
 
 def wait(state_doc, rds_session):
     """wait: currently waiting for the next snapshot to appear."""
@@ -129,6 +138,7 @@ def cleanup(state_doc, rds_session):
         destroy_database_subnet_group(rds_session, state_doc.tmp_database)
         # remove tmp_password, clear old states, wait for next snapshot.
         state_doc.clean()
+        logger.info(dbsnap_verify_datadog_output(state_doc, "OK"))
         # wait for next snapshot (which could appear tomorrow).
         state_doc.transition_state("wait")
     elif tmp_db_description["DBInstanceStatus"] == "available":
@@ -149,9 +159,7 @@ def cleanup(state_doc, rds_session):
 
 def alarm(state_doc, rds_session):
     """"alarm: something went wrong we are going to scream about it."""
-    # TODO:  trigger an alarm, cloudwatch and optionally datadog.
-    # currently not implemented
-    pass
+    logger.error(dbsnap_verify_datadog_output(state_doc, "CRITICAL"))
 
 state_handlers = {
   "wait": wait,

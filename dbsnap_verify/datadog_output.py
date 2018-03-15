@@ -4,6 +4,7 @@ import time
 DATADOG_METRIC_TYPES = {"count", "gauge", "histogram", "check"}
 
 # https://github.com/DataDog/datadogpy/blob/master/datadog/api/constants.py
+# I kept the existing upstream structure to make it easy for future patches.
 class CheckStatus(object):
     OK = 0
     WARNING = 1

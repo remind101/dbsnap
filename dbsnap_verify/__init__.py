@@ -172,9 +172,7 @@ state_handlers = {
 
 def handler(event):
     """The main entrypoint called from CLI or when our AWS Lambda wakes up."""
-    from sys import stdout
     logger.setLevel(environ.get("LOG_LEVEL", "INFO"))
-    logger.addHandler(logging.StreamHandler(stdout))
     logger.debug("%s", event)
     state_doc = get_or_create_state_doc(event)
     if state_doc is None:

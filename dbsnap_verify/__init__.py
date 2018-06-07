@@ -1,6 +1,6 @@
 from os import environ
 
-from .rds_funcs import (
+from dbsnap.rds_funcs import (
     get_latest_snapshot,
     get_database_description,
     restore_from_latest_snapshot,

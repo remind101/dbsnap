@@ -6,7 +6,7 @@ import time
 
 import boto3
 
-from .rds_funcs import dbsnap_verify_db_id
+from dbsnap.rds_funcs import dbsnap_verify_identifier
 
 DB_ID_PREFIX_LEN = 14
 
@@ -239,12 +239,12 @@ class DbsnapVerifyStateDoc(StateDoc):
             snapshot_verifying=snapshot_verifying,
             snapshot_verified=snapshot_verified,
             tmp_password=tmp_password,
-            **kwargs,
+            **kwargs
         )
 
     @property
     def tmp_database(self):
-        return dbsnap_verify_db_id(self.database)
+        return dbsnap_verify_identifier(self.database)
 
     def clean(self, state_count_to_keep=100):
         self.tmp_password = None

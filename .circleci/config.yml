@@ -1,10 +1,22 @@
 # Python CircleCI 2.0 configuration file
 #
 # Check https://circleci.com/docs/2.0/language-python/ for more details
-#
+
 version: 2
-jobs:
-  build:
+
+workflows:
+  version: 2
+  build_and_publish:
+    jobs:
+      - dbsnap_verify_lambda_zip
+      - docker_image:
+          context: docker-hub
+
+jobs:  
+
+  # This jon creates a AWS lambda zip file.
+  # Right now dbsnap-verify runs on AWS Lambda.
+  dbsnap_verify_lambda_zip:
     docker:
       # specify the version you desire here
       # use `-browsers` prefix for selenium tests, e.g. `3.6.1-browsers`
@@ -19,14 +31,24 @@ jobs:
 
     steps:
       - checkout
-
       - run:
           name: run tests
           command: make test3
-
       - run:
           name: install dependencies
           command: make build-lambda3
-
       - store_artifacts:
           path: ~/repo/artifacts
+
+  # This job creates a docker image using the given Docker file.
+  # Right now dbsnap-copy runs on Empire.
+  docker_image:
+    docker:
+      # https://github.com/remind101/docker-build/commits/5af523d5343bb852aa41c56b47dd470b9d3beccd
+      - image: remind101/docker-build@sha256:d8087702ebd201855dd98dff98bb122a2cb18149edb1e1d6ee3b09e635b0f43b
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
+      - run: docker-build # build, tag and push
+

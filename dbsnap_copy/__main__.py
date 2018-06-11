@@ -10,10 +10,7 @@ from datetime import datetime
 
 import boto3
 
-from dbsnap import (
-    get_latest_snapshot,
-    get_old_dbsnap_snapshots,
-)
+from dbsnap import get_latest_snapshot, get_old_dbsnap_snapshots
 
 from dbsnap_copy import (
     parse_source,
@@ -36,7 +33,7 @@ def parse_args():
         default=":",
         help="The destination of the snapshot in the format: "
         "[<region>]:[<new-snapshot-name>]). "
-        "Defaults to the same region as source."
+        "Defaults to the same region as source.",
     )
     parser.add_argument(
         "--prune-old",
@@ -97,7 +94,10 @@ def main():
 
     if not args.dry_run:
         source_snapshot.copy(
-            target_snapshot_name, dest_session=dest_session, tags=tags, kms_key=args.kms_key
+            target_snapshot_name,
+            dest_session=dest_session,
+            tags=tags,
+            kms_key=args.kms_key,
         )
 
     if args.prune_old:

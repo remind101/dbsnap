@@ -80,4 +80,3 @@ class Snapshot(object):
             copy_args["SourceDBSnapshotIdentifier"] = self.arn
             copy_args["TargetDBSnapshotIdentifier"] = target_snapshot_name
             dest_session.copy_db_snapshot(**copy_args)
-

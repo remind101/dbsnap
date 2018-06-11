@@ -18,4 +18,3 @@ def get_tags_for_rds_arn(session, rds_arn):
     return make_tag_dict(
         session.list_tags_for_resource(ResourceName=rds_arn)["TagList"]
     )
-

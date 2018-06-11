@@ -5,8 +5,8 @@ import re
 Source = namedtuple("Source", ["region", "id"])
 Dest = namedtuple("Dest", ["region", "name"])
 
-RE_UNSAFE = re.compile(r'[^a-zA-Z0-9-]')
-RE_DEDUPE = re.compile(r'-+')
+RE_UNSAFE = re.compile(r"[^a-zA-Z0-9-]")
+RE_DEDUPE = re.compile(r"-+")
 
 
 def parse_source(source):
@@ -22,8 +22,7 @@ def parse_source(source):
         region, _id = source.split(":", 1)
     except ValueError:
         raise ValueError(
-            "Pass source like this <region>:<db-identifier> not `{}`."
-                .format(source)
+            "Pass source like this <region>:<db-identifier> not `{}`.".format(source)
         )
 
     return Source(region, _id)
@@ -43,8 +42,7 @@ def parse_destination(source_region, d=":"):
         r, s = d.split(":", 1)
     except ValueError:
         raise ValueError(
-            "Dest {} not in [<region>]:[<db-instance-identifier>] form."
-              .format(d)
+            "Dest {} not in [<region>]:[<db-instance-identifier>] form.".format(d)
         )
     region = r or source_region
     snapshot_name = s or None
@@ -55,9 +53,10 @@ def parse_destination(source_region, d=":"):
 def get_account_id():
     """Returns the AWS Account ID for the provided credentials."""
     import boto3
-    session = boto3.client('iam', region_name='us-east-1')
-    first_arn = session.list_users()['Users'][0]['Arn']
-    return first_arn.split(':')[4]
+
+    session = boto3.client("iam", region_name="us-east-1")
+    first_arn = session.list_users()["Users"][0]["Arn"]
+    return first_arn.split(":")[4]
 
 
 def sanitize_snapshot_name(*args):
@@ -68,8 +67,8 @@ def sanitize_snapshot_name(*args):
     >>> make_env_var_name('prod_api-db_copy:test$_db-to-us-west-1')
     'prod-api-db-copy-test-db-to-us-west-1'
     """
-    subject = '-'.join(args)
-    return RE_DEDUPE.sub('-', RE_UNSAFE.sub('-', subject))
+    subject = "-".join(args)
+    return RE_DEDUPE.sub("-", RE_UNSAFE.sub("-", subject))
 
 
 def get_snapshot_target_name(dest, source_name, source_region, now):

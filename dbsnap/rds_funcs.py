@@ -22,14 +22,16 @@ def get_rds_type(session, identifier):
     try:
         session.describe_db_instances(DBInstanceIdentifier=identifier)["DBInstances"]
         return "db"
-    except:
+    except session.exceptions.DBInstanceNotFoundFault:
         pass
     try:
         session.describe_db_clusters(DBClusterIdentifier=identifier)["DBClusters"]
         return "cluster"
-    except:
+    except session.exceptions.DBClusterNotFoundFault:
         pass
-    raise LookupError("No RDS DB or Cluster found with identifier: {}".format(identifier))
+    raise LookupError(
+        "No RDS DB or Cluster found with identifier: {}".format(identifier)
+    )
 
 
 def get_available_snapshots(session, identifier, snapshot_type=None):
@@ -80,9 +82,9 @@ def get_available_dbsnap_snapshots(session, identifier):
         list: A list of dictionaries representing the resulting snapshots.
     """
     dbsnap_snapshots = []
-    snapshots = get_available_snapshots(session, identifier, snapshot_type='manual')
+    snapshots = get_available_snapshots(session, identifier, snapshot_type="manual")
     for snapshot in snapshots:
-        if snapshot.tags.get('created_by') == 'dbsnap-copy':
+        if snapshot.tags.get("created_by") == "dbsnap-copy":
             dbsnap_snapshots.append(snapshot)
     return dbsnap_snapshots
 
@@ -124,7 +126,7 @@ def get_latest_snapshot(session, identifier, snapshot_type=None):
     return snapshots[-1]
 
 
-def generate_password(size=9, pool=letters+digits):
+def generate_password(size=9, pool=letters + digits):
     """Return a system generated password.
     Args:
         size (int): The desired length of the password to generate (Default 9).
@@ -133,7 +135,7 @@ def generate_password(size=9, pool=letters+digits):
     Returns:
         str: the raw password
     """
-    return ''.join([choice(pool) for i in range(size)])
+    return "".join([choice(pool) for i in range(size)])
 
 
 def dbsnap_verify_identifier(identifier):
@@ -155,9 +157,9 @@ def get_database_subnet_group_description(session, identifier):
         dictionary: description of RDS database instance
     """
     try:
-        return session.describe_db_subnet_groups(
-            DBSubnetGroupName=identifier
-        )['DBSubnetGroups'][0]
+        return session.describe_db_subnet_groups(DBSubnetGroupName=identifier)[
+            "DBSubnetGroups"
+        ][0]
     except session.exceptions.DBSubnetGroupNotFoundFault:
         return None
 
@@ -169,12 +171,12 @@ def safer_create_database_subnet_group(session, identifier, sn_ids):
         destroy_database_subnet_group(session, new_identifier)
 
     session.create_db_subnet_group(
-        DBSubnetGroupName = new_identifier,
-        DBSubnetGroupDescription = new_identifier,
-        SubnetIds = sn_ids,
+        DBSubnetGroupName=new_identifier,
+        DBSubnetGroupDescription=new_identifier,
+        SubnetIds=sn_ids,
         Tags=[
-            {"Key" : "Name", "Value" : new_identifier},
-            {"Key" : SAFETY_TAG_KEY, "Value" : SAFETY_TAG_VAL},
+            {"Key": "Name", "Value": new_identifier},
+            {"Key": SAFETY_TAG_KEY, "Value": SAFETY_TAG_VAL},
         ],
     )
 
@@ -199,8 +201,8 @@ def restore_from_latest_snapshot(session, identifier, sn_ids):
         PubliclyAccessible=False,
         MultiAZ=False,
         Tags=[
-            {"Key" : "Name", "Value" : new_identifier},
-            {"Key" : SAFETY_TAG_KEY, "Value" : SAFETY_TAG_VAL},
+            {"Key": "Name", "Value": new_identifier},
+            {"Key": SAFETY_TAG_KEY, "Value": SAFETY_TAG_VAL},
         ],
     )
 
@@ -216,9 +218,9 @@ def get_database_description(session, identifier):
         dictionary: description of RDS database instance
     """
     try:
-        return session.describe_db_instances(
-            DBInstanceIdentifier=identifier
-        )['DBInstances'][0]
+        return session.describe_db_instances(DBInstanceIdentifier=identifier)[
+            "DBInstances"
+        ][0]
     except session.exceptions.DBInstanceNotFoundFault:
         return None
 
@@ -228,15 +230,15 @@ def get_database_events(session, identifier, event_catagories=None, duration=144
         event_catagories = []
     return session.describe_events(
         SourceIdentifier=identifier,
-        SourceType='db-instance',
-        EventCategories = event_catagories,
-        Duration = duration,
-    )['Events']
+        SourceType="db-instance",
+        EventCategories=event_catagories,
+        Duration=duration,
+    )["Events"]
 
 
 def rds_event_messages(session, identifier, event_catagories=None, duration=1440):
     events = get_database_events(session, identifier, event_catagories, duration)
-    return [i['Message'] for i in events]
+    return [i["Message"] for i in events]
 
 
 def modify_db_instance_for_verify(session, identifier, sg_ids):
@@ -298,15 +300,11 @@ def destroy_database(session, identifier, db_arn=None):
     if tags.get(SAFETY_TAG_KEY) != SAFETY_TAG_VAL:
         raise Exception(
             "sheepishly refusing to destroy {}, missing `{}` tag".format(
-                identifier,
-                SAFETY_TAG_KEY
+                identifier, SAFETY_TAG_KEY
             )
         )
 
-    session.delete_db_instance(
-        DBInstanceIdentifier=identifier,
-        SkipFinalSnapshot=True
-    )
+    session.delete_db_instance(DBInstanceIdentifier=identifier, SkipFinalSnapshot=True)
 
 
 def destroy_database_subnet_group(session, identifier):
@@ -317,8 +315,4 @@ def destroy_database_subnet_group(session, identifier):
         identifier (str): The RDS database instance subnet identifier to destroy.
     """
     if get_database_subnet_group_description(session, identifier) is not None:
-        session.delete_db_subnet_group(
-            DBSubnetGroupName=identifier,
-        )
-
-
+        session.delete_db_subnet_group(DBSubnetGroupName=identifier)

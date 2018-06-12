@@ -6,7 +6,7 @@ import time
 
 import boto3
 
-from .rds_funcs import dbsnap_verify_db_id
+from dbsnap.rds_funcs import dbsnap_verify_identifier
 
 DB_ID_PREFIX_LEN = 14
 
@@ -53,14 +53,9 @@ class DocToObject(object):
 
 
 class StateDoc(DocToObject):
-
     def __init__(
-            self,
-            name,
-            states=None,
-            state_doc_path=None,
-            state_doc_bucket=None,
-            **kwargs):
+        self, name, states=None, state_doc_path=None, state_doc_bucket=None, **kwargs
+    ):
 
         if states is None:
             self.states = []
@@ -116,23 +111,22 @@ class StateDoc(DocToObject):
                 Key=self.state_doc_s3_key,
                 Body=self.to_json,
             )
-    
+
     def _load_state_doc_from_s3(self):
         """Returns a JSON String State Document."""
         s3 = boto3.client("s3")
         s3_object = s3.get_object(
-            Bucket=self.state_doc_bucket_name,
-            Key=self.state_doc_s3_key,
+            Bucket=self.state_doc_bucket_name, Key=self.state_doc_s3_key
         )
         return s3_object["Body"].read().decode("utf-8")
 
     def _save_state_doc_in_path(self):
-        with open(self.state_doc_file_path, 'w') as json_file:
+        with open(self.state_doc_file_path, "w") as json_file:
             json_file.write(self.to_json)
 
     def _load_state_doc_from_path(self):
         """Returns a JSON String State Document."""
-        with open(self.state_doc_file_path, 'r') as json_file:
+        with open(self.state_doc_file_path, "r") as json_file:
             return json_file.read()
 
     def is_valid_transition(self, new_state):
@@ -150,9 +144,7 @@ class StateDoc(DocToObject):
                         self.current_state, new_state, self.valid_transitions
                     )
                 )
-        self.states.append(
-            {"state" : new_state, "timestamp" : now_timestamp()}
-        )
+        self.states.append({"state": new_state, "timestamp": now_timestamp()})
         self.save()
 
     def trim_states(self, count_to_keep=100):
@@ -191,7 +183,7 @@ class DbsnapVerifyStateDoc(StateDoc):
         snapshot_verified=None,
         tmp_password=None,
         **kwargs
-        ):
+    ):
         """
         database (string):
             The AWS RDS DB Identifier whose snapshot we should restore/verify.
@@ -239,12 +231,12 @@ class DbsnapVerifyStateDoc(StateDoc):
             snapshot_verifying=snapshot_verifying,
             snapshot_verified=snapshot_verified,
             tmp_password=tmp_password,
-            **kwargs,
+            **kwargs
         )
 
     @property
     def tmp_database(self):
-        return dbsnap_verify_db_id(self.database)
+        return dbsnap_verify_identifier(self.database)
 
     def clean(self, state_count_to_keep=100):
         self.tmp_password = None
@@ -268,22 +260,22 @@ class DbsnapVerifyStateDoc(StateDoc):
     @property
     def transition_map(self):
         return {
-            "wait" : ["restore", "alarm"],
-            "restore" : ["modify", "alarm"],
-            "modify" : ["verify", "alarm"],
-            "verify" : ["cleanup", "alarm"],
-            "cleanup" : ["wait", "alarm"],
-            "alarm" : ["cleanup", "alarm"],
+            "wait": ["restore", "alarm"],
+            "restore": ["modify", "alarm"],
+            "modify": ["verify", "alarm"],
+            "verify": ["cleanup", "alarm"],
+            "cleanup": ["wait", "alarm"],
+            "alarm": ["cleanup", "alarm"],
         }
 
 
 def create_dbsnap_verify_state_doc(
-        database,
-        database_subnet_ids,
-        database_security_group_ids,
-        snapshot_region,
-        **kwargs
-    ):
+    database,
+    database_subnet_ids,
+    database_security_group_ids,
+    snapshot_region,
+    **kwargs
+):
     state_doc = DbsnapVerifyStateDoc(
         database,
         database_subnet_ids=database_subnet_ids,
@@ -298,9 +290,7 @@ def create_dbsnap_verify_state_doc(
 def get_state_doc_from_sns_event(event):
     """Return state_doc (or None) for a RDS event, instead of config event."""
     try:
-        event_payload = json.loads(
-            event["Records"][0]["Sns"]["Message"]
-        )
+        event_payload = json.loads(event["Records"][0]["Sns"]["Message"])
         # strip "dbsnap-verify-" from tmp_database name.
         database_id = event_payload["Source ID"][DB_ID_PREFIX_LEN:]
         rds_event_message = event_payload["Event Message"]
@@ -309,8 +299,7 @@ def get_state_doc_from_sns_event(event):
         return None
 
     state_doc = DbsnapVerifyStateDoc(
-        database_id,
-        rds_event_latest_message = rds_event_message
+        database_id, rds_event_latest_message=rds_event_message
     )
 
     return state_doc

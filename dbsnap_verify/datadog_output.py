@@ -21,7 +21,7 @@ def validate_metric_type(metric_type):
     if metric_type not in DATADOG_METRIC_TYPES:
         raise Exception(
             "Invalid datadog metric_type {}, must be {}".format(
-                 metric_type, DATADOG_METRIC_TYPES
+                metric_type, DATADOG_METRIC_TYPES
             )
         )
 
@@ -44,7 +44,9 @@ def format_metric_tags(metric_tags):
     return metric_tags
 
 
-def datadog_lambda_metric_output(metric_name, metric_value, metric_type="count", metric_tags=""):
+def datadog_lambda_metric_output(
+    metric_name, metric_value, metric_type="count", metric_tags=""
+):
     validate_metric_type(metric_type)
     return "MONITORING|{}|{}|{}|{}|{}".format(
         now_timestamp(),

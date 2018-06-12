@@ -1,7 +1,7 @@
 COMMIT_HASH = $(shell git log -n 1 --pretty=format:"%H")
 
 clean:
-		rm -rf ./env ./dist ./build ./artifacts ./dbsnap_verify.egg-info
+		rm -rf ./env ./dist ./build ./artifacts ./dbsnap*.egg-info
 
 ### Python2 ###
 
@@ -18,7 +18,7 @@ build-lambda: build
 	    mkdir ./artifacts
 		cp aws_lambda.py ./dist
 		cp -rf env/lib/python*/site-packages/* ./dist
-		cd ./dist && zip -r "../artifacts/lambda-dbsnap-verify-$(COMMIT_HASH).zip" .
+		cd ./dist && zip -r "../artifacts/lambda-dbsnap-$(COMMIT_HASH).zip" .
 
 ### Python3 ###
 
@@ -35,4 +35,4 @@ build-lambda3: build3
 	    mkdir ./artifacts
 		cp aws_lambda.py ./dist
 		cp -rf env/lib/python*/site-packages/* ./dist
-		cd ./dist && zip -r "../artifacts/lambda-dbsnap-verify-$(COMMIT_HASH).zip" .
+		cd ./dist && zip -r "../artifacts/lambda-dbsnap-$(COMMIT_HASH).zip" .

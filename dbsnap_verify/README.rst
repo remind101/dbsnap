@@ -30,7 +30,7 @@ Verify install::
 
 The tool expects to be passed a JSON config file that mirrors the same config that the AWS Lambda would be provided.
 
-An example `dbsnap-verify-config.json <https://github.com/remind101/dbsnap-verify/blob/master/tests/fixtures/config_or_event.json>`_ may be found here.
+An example `dbsnap-verify-config.json <https://github.com/remind101/dbsnap/blob/master/tests/fixtures/config_or_event.json>`_ may be found here.
 
 
 AWS Lambda
@@ -44,12 +44,12 @@ In our case use use a Cloudwatch Rule Event Trigger to invoke our Lambda at a ``
 
 The payload of this Cloudwatch Rule is a Static JSON value and is in the same form as the config used for the CLI.
 
-An example `dbsnap-verify-config.json <https://github.com/remind101/dbsnap-verify/blob/master/tests/fixtures/config_or_event.json>`_ may be found here.
+An example `dbsnap-verify-config.json <https://github.com/remind101/dbsnap/blob/master/tests/fixtures/config_or_event.json>`_ may be found here.
 
 config.json
 ===============
 
-An example `dbsnap-verify-config.json <https://github.com/remind101/dbsnap-verify/blob/master/tests/fixtures/config_or_event.json>`_ may be found here.
+An example `dbsnap-verify-config.json <https://github.com/remind101/dbsnap/blob/master/tests/fixtures/config_or_event.json>`_ may be found here.
 
 database (string):
  The AWS RDS DB Identifier whose snapshot we should restore/verify.
@@ -115,7 +115,7 @@ This ``state_doc`` may be stored in either a local file or ``S3``.
 
 You do not need to create this document, the tool manages it automatically.
 
-An `example_state_doc.json <https://github.com/remind101/dbsnap-verify/blob/master/tests/fixtures/example_state_doc.json>`_ may be found here.
+An `example_state_doc.json <https://github.com/remind101/dbsnap/blob/master/tests/fixtures/example_state_doc.json>`_ may be found here.
 
 
 State Machine Diagram
@@ -123,6 +123,6 @@ State Machine Diagram
 
 Here is a diagram of the state machine transitions and states.
 
-.. image:: https://github.com/remind101/dbsnap-verify/raw/master/dbsnap-verify-rds-snapshot-verification-lambda-s3-state-machine.png
+.. image:: https://github.com/remind101/dbsnap/raw/master/dbsnap_verify/dbsnap-verify-rds-snapshot-verification-lambda-s3-state-machine.png
   :align: center
 

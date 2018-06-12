@@ -52,10 +52,10 @@ class Snapshot(object):
     def delete(self):
         if self.is_cluster:
             self.session.delete_db_cluster_snapshot(
-                DBClusterSnapshotIdentifier=snapshot.id
+                DBClusterSnapshotIdentifier=self.id
             )
         else:
-            self.session.delete_db_snapshot(DBSnapshotIdentifier=snapshot.id)
+            self.session.delete_db_snapshot(DBSnapshotIdentifier=self.id)
 
     def copy(self, target_snapshot_name, dest_session=None, tags=None, kms_key=None):
 

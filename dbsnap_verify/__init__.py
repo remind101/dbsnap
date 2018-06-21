@@ -1,14 +1,12 @@
-from os import environ
-
 from dbsnap.rds_funcs import (
     get_latest_snapshot,
-    get_database_description,
     restore_from_latest_snapshot,
-    modify_db_instance_for_verify,
-    destroy_database,
+    modify_instance_or_cluster_for_verify,
+    delete_verified_database,
     destroy_database_subnet_group,
-    rds_event_messages,
 )
+
+from dbsnap.database import Database
 
 from .state_doc import get_or_create_state_doc
 
@@ -23,7 +21,7 @@ BOTO3_CONFIG = Config(retries={"max_attempts": 3})
 
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("dbsnap")
 
 
 def dbsnap_verify_datadog_output(state_doc, alarm_status="OK"):
@@ -41,11 +39,11 @@ def wait(state_doc, rds_session):
         state_doc.database,
         state_doc.snapshot_verified,
     )
-    snapshot_desc = get_latest_snapshot(rds_session, state_doc.database)
-    if snapshot_desc["DBSnapshotIdentifier"] != state_doc.snapshot_verified:
+    snapshot = get_latest_snapshot(rds_session, state_doc.database)
+    if snapshot.id != state_doc.snapshot_verified:
         # if the latest snapshot is not equal to the most recently
-        # verified snapshot, restore / and verify it.
-        state_doc.snapshot_verifying = snapshot_desc["DBSnapshotIdentifier"]
+        # verified snapshot, restore and verify it.
+        state_doc.snapshot_verifying = snapshot.id
         state_doc.transition_state("restore")
         restore(state_doc, rds_session)
     else:
@@ -60,17 +58,41 @@ def wait(state_doc, rds_session):
 def restore(state_doc, rds_session):
     """restore: currently restoring a copy of the latest
     snapshot into a temporary RDS db instance."""
-    tmp_db_description = get_database_description(rds_session, state_doc.tmp_database)
-    if tmp_db_description is None:
+    tmp_database = Database(session=rds_session, identifier=state_doc.tmp_database)
+    if not tmp_database:
         logger.info(
             "Restoring snapshot of %s to %s", state_doc.database, state_doc.tmp_database
         )
         restore_from_latest_snapshot(
             rds_session, state_doc.database, state_doc.subnet_ids
         )
-    elif tmp_db_description["DBInstanceStatus"] == "available":
+    elif tmp_database.status == "available":
+        if tmp_database.is_cluster:
+            if not tmp_database.cluster_member_ids:
+                logger.info(
+                    "Creating cluster member instance for cluster (%s)", tmp_database.id
+                )
+                # No straight forward way to use the same instance class as
+                # the source for clusters (Aurora) but not sure it matters.
+                # Hardcoding this instance_class as it's currently the smallest/cheapest.
+                instance_identifier = "i-{}".format(tmp_database.id)
+                tmp_database.create_cluster_instance(instance_identifier, "db.r4.large")
+                # exit early, we need an available cluster instance to continue.
+                return None
+
+            cluster_member = tmp_database.cluster_members[0]
+
+            if cluster_member.status != "available":
+                logger.info(
+                    "Waiting for cluster member instance to become available (%s)",
+                    cluster_member.id,
+                )
+                # exit early, we need an available cluster instance to continue.
+                return None
+
         state_doc.transition_state("modify")
         modify(state_doc, rds_session)
+
     else:
         logger.info(
             "Still restoring snapshot of %s to %s",
@@ -82,11 +104,12 @@ def restore(state_doc, rds_session):
 def modify(state_doc, rds_session):
     """modify: currently modifying the temporary RDS db instance
     settings to allow the dbsnap-verify tool to access it."""
+    tmp_database = Database(session=rds_session, identifier=state_doc.tmp_database)
     logger.info(
         "Modifying %s master password and security groups", state_doc.tmp_database
     )
-    state_doc.tmp_password = modify_db_instance_for_verify(
-        rds_session, state_doc.tmp_database, state_doc.security_group_ids
+    state_doc.tmp_password = modify_instance_or_cluster_for_verify(
+        tmp_database, state_doc.security_group_ids
     )
     state_doc.transition_state("verify")
     verify(state_doc, rds_session)
@@ -95,12 +118,10 @@ def modify(state_doc, rds_session):
 def verify(state_doc, rds_session):
     """verify: currently verifying the temporary RDS db instance
     using the supplied checks. (not implemented)"""
-    tmp_db_description = get_database_description(rds_session, state_doc.tmp_database)
-    tmp_db_status = tmp_db_description["DBInstanceStatus"]
-    tmp_db_event_messages = rds_event_messages(rds_session, state_doc.tmp_database)
+    tmp_database = Database(session=rds_session, identifier=state_doc.tmp_database)
     if (
-        "Reset master credentials" in tmp_db_event_messages
-        and tmp_db_status == "available"
+        "Reset master credentials" in tmp_database.event_messages
+        and tmp_database.status == "available"
     ):
         # TODO: this is currently not implemented so we move to cleanup.
         # in the future this code block will actually connect to the endpoint
@@ -115,26 +136,27 @@ def verify(state_doc, rds_session):
         #    alarm(state_doc, "error")
         state_doc.transition_state("cleanup")
         cleanup(state_doc, rds_session)
+    else:
+        logger.info("Waiting for master credentials reset for %s", state_doc.tmp_database)
+
 
 
 def cleanup(state_doc, rds_session):
     """clean: currently tearing down the temporary RDS db instance
     and anything else we created or modified."""
-    tmp_db_description = get_database_description(rds_session, state_doc.tmp_database)
-    if tmp_db_description is None:
+    tmp_database = Database(session=rds_session, identifier=state_doc.tmp_database)
+    if not tmp_database:
         # cleanup of db subnet group, tmp_password, and transition to wait.
         logger.info("cleaning %s subnet group and tmp_password", state_doc.tmp_database)
         destroy_database_subnet_group(rds_session, state_doc.tmp_database)
-        # remove tmp_password, clear old states, wait for next snapshot.
+        # remove tmp_password, clear old states.
         state_doc.clean()
         logger.info(dbsnap_verify_datadog_output(state_doc, "OK"))
         # wait for next snapshot (which could appear tomorrow).
         state_doc.transition_state("wait")
-    elif tmp_db_description["DBInstanceStatus"] == "available":
+    elif tmp_database.status == "available":
         logger.info("cleaning / destroying %s", state_doc.tmp_database)
-        destroy_database(
-            rds_session, state_doc.tmp_database, tmp_db_description["DBInstanceArn"]
-        )
+        delete_verified_database(tmp_database)
     else:
         logger.info("still cleaning / destroying %s", state_doc.tmp_database)
 
@@ -156,7 +178,6 @@ state_handlers = {
 
 def handler(event):
     """The main entrypoint called from CLI or when our AWS Lambda wakes up."""
-    logger.setLevel(environ.get("LOG_LEVEL", "INFO"))
     logger.debug("%s", event)
     state_doc = get_or_create_state_doc(event)
     if state_doc is None:

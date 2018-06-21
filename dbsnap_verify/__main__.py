@@ -4,6 +4,19 @@ import json
 
 from . import handler
 
+from os import environ
+import logging
+
+log_level = environ.get("LOG_LEVEL", "INFO")
+logger = logging.getLogger("dbsnap")
+logger.setLevel(log_level)
+
+from sys import stdout
+
+ch = logging.StreamHandler(stdout)
+ch.setLevel(log_level)
+logger.addHandler(ch)
+
 
 def main():
     parser = argparse.ArgumentParser(description="verify AWS RDS DB snapshots.")

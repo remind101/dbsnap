@@ -78,4 +78,3 @@ class TestSnapshot(unittest.TestCase):
     def test_malformed_snapshot_description(self):
         with self.assertRaises(LookupError):
             Snapshot(self.snapshot_description3)
-

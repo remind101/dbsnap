@@ -5,13 +5,13 @@ from dbsnap_verify.datadog_output import (
     datadog_lambda_metric_output,
 )
 
-class Tests(unittest.TestCase):
 
+class Tests(unittest.TestCase):
     def test_datadog_check_ok(self):
         output = datadog_lambda_check_output(
             metric_name="dbsnap-verify.lambda",
             metric_value="OK",
-            metric_tags={"database" : "test-db-instance"}
+            metric_tags={"database": "test-db-instance"},
         )
         self.assertIn("|#database:test-db-instance", output)
         self.assertIn("MONITORING|", output)
@@ -21,7 +21,7 @@ class Tests(unittest.TestCase):
         output = datadog_lambda_check_output(
             metric_name="dbsnap-verify.lambda",
             metric_value="CRITICAL",
-            metric_tags={"database" : "test-db-instance"}
+            metric_tags={"database": "test-db-instance"},
         )
         self.assertIn("|#database:test-db-instance", output)
         self.assertIn("MONITORING|", output)
@@ -31,7 +31,7 @@ class Tests(unittest.TestCase):
         output = datadog_lambda_check_output(
             metric_name="dbsnap-verify.lambda",
             metric_value="OK",
-            metric_tags={"database" : "test-db-instance", "another" : 3}
+            metric_tags={"database": "test-db-instance", "another": 3},
         )
         self.assertIn("|#database:test-db-instance,another:3", output)
 
@@ -39,7 +39,7 @@ class Tests(unittest.TestCase):
         output = datadog_lambda_check_output(
             metric_name="dbsnap-verify.lambda",
             metric_value="CRITICAL",
-            metric_tags="database:test-db-instance"
+            metric_tags="database:test-db-instance",
         )
         self.assertIn("|#database:test-db-instance", output)
 
@@ -47,7 +47,7 @@ class Tests(unittest.TestCase):
         output = datadog_lambda_check_output(
             metric_name="dbsnap-verify.lambda",
             metric_value="CRITICAL",
-            metric_tags="#database:test-db-instance"
+            metric_tags="#database:test-db-instance",
         )
         self.assertIn("|#database:test-db-instance", output)
 
@@ -55,7 +55,7 @@ class Tests(unittest.TestCase):
         output = datadog_lambda_check_output(
             metric_name="dbsnap-verify.lambda",
             metric_value="CRITICAL",
-            metric_tags=["database:test-db-instance", "another"]
+            metric_tags=["database:test-db-instance", "another"],
         )
         self.assertIn("|#database:test-db-instance,another", output)
 
@@ -65,5 +65,5 @@ class Tests(unittest.TestCase):
                 metric_name="dbsnap-verify.lambda",
                 metric_type="taco",
                 metric_value=42,
-                metric_tags=["database:test-db-instance", "another"]
+                metric_tags=["database:test-db-instance", "another"],
             )

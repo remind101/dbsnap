@@ -4,11 +4,7 @@ import mock
 
 import json
 
-from dbsnap_verify.state_doc import (
-    DocToObject,
-    StateDoc,
-    DbsnapVerifyStateDoc,
-)
+from dbsnap_verify.state_doc import DocToObject, StateDoc, DbsnapVerifyStateDoc
 
 
 JSON_STATE_DOC = """{
@@ -35,7 +31,6 @@ mock_dict_state_doc = mock.Mock(return_value=DICT_STATE_DOC)
 
 
 class TestDocToObject(unittest.TestCase):
-
     def test_no_args(self):
         o = DocToObject()
         self.assertEqual(o.__dict__, {})
@@ -46,32 +41,29 @@ class TestDocToObject(unittest.TestCase):
             o.a
 
     def test_two_args_from_dictionary(self):
-        o = DocToObject({"a":1, "b":2})
+        o = DocToObject({"a": 1, "b": 2})
         self.assertEqual(o.a, 1)
         self.assertEqual(o.b, 2)
 
     def test_to_json(self):
-        o1 = DocToObject({"a":1, "b":2})
+        o1 = DocToObject({"a": 1, "b": 2})
         self.assertEqual(o1.to_json, '{\n  "a": 1,\n  "b": 2\n}')
-        o2 = DocToObject({"b":2, "a":1})
+        o2 = DocToObject({"b": 2, "a": 1})
         self.assertEqual(o2.to_json, '{\n  "b": 2,\n  "a": 1\n}')
         with self.assertRaises(Exception):
             o2 = DocToObject(42)
 
 
 class TestStateDoc(unittest.TestCase):
-
     def setUp(self):
         self.name = "test"
         self.bucket = "bucket-to-hold-state-documents"
         self.states = [
-            {"state" : "wait", "timestamp" : 1519821752.33388},
-            {"state" : "restore", "timestamp" : 1519821861.627925},
+            {"state": "wait", "timestamp": 1519821752.33388},
+            {"state": "restore", "timestamp": 1519821861.627925},
         ]
         self.state_doc = StateDoc(
-            name=self.name,
-            states=self.states,
-            state_doc_bucket=self.bucket
+            name=self.name, states=self.states, state_doc_bucket=self.bucket
         )
         self.json_state_doc = JSON_STATE_DOC
         self.dict_state_doc = DICT_STATE_DOC
@@ -101,19 +93,13 @@ class TestStateDoc(unittest.TestCase):
     def test_state_doc_s3_key(self):
         self.assertEqual(self.state_doc.state_doc_s3_key, "state-doc-test.json")
 
-    @mock.patch(
-        'dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3',
-        mock_none
-    )
+    @mock.patch("dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3", mock_none)
     def test_transition(self):
         self.state_doc.transition_state("modify")
         self.assertEqual(self.state_doc.current_state, "modify")
         self.assertEqual(len(self.state_doc.states), 3)
 
-    @mock.patch(
-        'dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3',
-        mock_none
-    )
+    @mock.patch("dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3", mock_none)
     def test_transition_2(self):
         self.state_doc.transition_state("modify")
         self.state_doc.transition_state("verify")
@@ -121,8 +107,7 @@ class TestStateDoc(unittest.TestCase):
         self.assertEqual(len(self.state_doc.states), 4)
 
     @mock.patch(
-        'dbsnap_verify.state_doc.StateDoc._load_state_doc_from_s3',
-        mock_dict_state_doc
+        "dbsnap_verify.state_doc.StateDoc._load_state_doc_from_s3", mock_dict_state_doc
     )
     def test_load_from_s3(self):
         state_doc = StateDoc(self.name, state_doc_bucket=self.bucket)
@@ -131,51 +116,34 @@ class TestStateDoc(unittest.TestCase):
 
 
 class TestDictDbsnapVerifyStateDoc(unittest.TestCase):
-
     def setUp(self):
         self.state_doc = DbsnapVerifyStateDoc(
-            database = "prod-test-db",
-            database_subnet_ids = "subnet-1111,subnet-2222,subnet-3333,subnet-4444",
-            database_security_group_ids = "sg-0123456789",
-            state_doc_bucket = "bucket-to-hold-state-documents",
-            snapshot_region = "us-west-1",
+            database="prod-test-db",
+            database_subnet_ids="subnet-1111,subnet-2222,subnet-3333,subnet-4444",
+            database_security_group_ids="sg-0123456789",
+            state_doc_bucket="bucket-to-hold-state-documents",
+            snapshot_region="us-west-1",
         )
         self.json_state_doc = self.state_doc.to_json
 
     def test_minimal_args(self):
-        self.assertEqual(
-            self.state_doc.database,
-            "prod-test-db"
-        )
+        self.assertEqual(self.state_doc.database, "prod-test-db")
         self.assertEqual(
             self.state_doc.database_subnet_ids,
-            "subnet-1111,subnet-2222,subnet-3333,subnet-4444"
+            "subnet-1111,subnet-2222,subnet-3333,subnet-4444",
         )
+        self.assertEqual(self.state_doc.database_security_group_ids, "sg-0123456789")
         self.assertEqual(
-            self.state_doc.database_security_group_ids,
-            "sg-0123456789"
+            self.state_doc.state_doc_bucket, "bucket-to-hold-state-documents"
         )
-        self.assertEqual(
-            self.state_doc.state_doc_bucket,
-            "bucket-to-hold-state-documents"
-        )
-        self.assertEqual(
-            self.state_doc.snapshot_region,
-            "us-west-1"
-        )
-        self.assertEqual(
-            self.state_doc.state_doc_path,
-            None
-        )
+        self.assertEqual(self.state_doc.snapshot_region, "us-west-1")
+        self.assertEqual(self.state_doc.state_doc_path, None)
         with self.assertRaises(AttributeError):
             self.state_doc.invalid_attribute
 
-    @mock.patch(
-        'dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3',
-        mock_none
-    )
+    @mock.patch("dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3", mock_none)
     def test_clean(self):
-        self.state_doc.states = range(0,1000)
+        self.state_doc.states = range(0, 1000)
         self.state_doc.tmp_password = "test-password"
         self.assertEqual(len(self.state_doc.states), 1000)
         self.state_doc.save()
@@ -183,10 +151,7 @@ class TestDictDbsnapVerifyStateDoc(unittest.TestCase):
         self.assertEqual(len(self.state_doc.states), 100)
         self.assertEqual(self.state_doc.tmp_password, None)
 
-    @mock.patch(
-        'dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3',
-        mock_none
-    )
+    @mock.patch("dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3", mock_none)
     def test_valid_transitions(self):
         self.state_doc.transition_state("wait", validate=False)
         self.state_doc.transition_state("restore")
@@ -211,10 +176,7 @@ class TestDictDbsnapVerifyStateDoc(unittest.TestCase):
         self.state_doc.transition_state("cleanup")
         self.state_doc.transition_state("wait")
 
-    @mock.patch(
-        'dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3',
-        mock_none
-    )
+    @mock.patch("dbsnap_verify.state_doc.StateDoc._save_state_doc_in_s3", mock_none)
     def test_invalid_transitions(self):
         with self.assertRaises(Exception):
             self.state_doc.transition_state("wait")

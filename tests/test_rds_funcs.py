@@ -1,102 +1,26 @@
-import unittest
-
-import mock
+from test_helper import TestHelper
 
 from dbsnap.rds_funcs import (
     get_available_snapshots,
     get_available_dbsnap_snapshots,
     get_old_dbsnap_snapshots,
     get_latest_snapshot,
-    get_database_description,
-    destroy_database,
+    dbsnap_verify_identifier,
+    delete_verified_database,
     SAFETY_TAG_KEY,
     SAFETY_TAG_VAL,
 )
 
-import boto3
-rds = boto3.client("rds", region_name="us-east-1")
+import mock
+
+from dbsnap.database import Database
 
 
-class TestRdsFuncs(unittest.TestCase):
-
-    def setUp(self):
-        self.fake_snapshot_desc = {
-            "DBSnapshots": [
-                {"DBSnapshotIdentifier": "rds:snapshot1",
-                 "DBSnapshotArn" : "arn:1",
-                 "Status": "available",
-                 "SnapshotType" : "manual",
-                 "SnapshotCreateTime": 1},
-                {"DBSnapshotIdentifier": "rds:snapshot2",
-                 "DBSnapshotArn" : "arn:2",
-                 "Status": "available",
-                 "SnapshotType" : "manual",
-                 "SnapshotCreateTime": 2.3},
-                {"DBSnapshotIdentifier": "rds:snapshot3",
-                 "DBSnapshotArn" : "arn:3",
-                 "Status": "available",
-                 "SnapshotType" : "manual",
-                 "SnapshotCreateTime": 10},
-                # Note: only available snapshots have a SnapshotCreateTime.
-                {"DBSnapshotIdentifier": "rds:snapshot4",
-                 "DBSnapshotArn" : "arn:4",
-                 "Status": "pending",
-                 "SnapshotType" : "manual",
-                },
-                {"DBSnapshotIdentifier": "rds:snapshot5",
-                 "DBSnapshotArn" : "arn:5",
-                 "SnapshotType" : "manual",
-                 "Status": "available",
-                 "SnapshotCreateTime": 8},
-                {"DBSnapshotIdentifier": "rds:snapshot6",
-                 "DBSnapshotArn" : "arn:6",
-                 "SnapshotType" : "manual",
-                 "Status": "available",
-                 "SnapshotCreateTime": 9},
-            ]
-        }
-        self.db_instance_1 = {
-            "DBInstances": [
-                {"DBSnapshotIdentifier": "instance1",
-                 "Status": "available", "InstanceCreateTime": 100},
-            ]
-        }
-        self.db_instance_2 = {
-            "DBInstances": [
-                {"DBSnapshotIdentifier": "instance2",
-                 "Status": "creating", "InstanceCreateTime": 100},
-            ]
-        }
-        self.fake_tags = {
-            "arn:1" : {
-                "TagList": [{"Key" : "created_by", "Value": "dbsnap-copy"}]
-            },
-            "arn:2" : {
-                "TagList": [{"Key" : "created_by", "Value": "dbsnap-copy"}]
-            },
-            "arn:3" : {
-                "TagList": [{"Key" : "created_by", "Value": "dbsnap-copy"}]
-            },
-            "arn:4" : {
-                "TagList": [{"Key" : "created_by", "Value": "dbsnap-copy"}]
-            },
-            "arn:5" : {
-                "TagList": [{"Key" : "created_by", "Value": "dbsnap-copy"}]
-            },
-            "arn:6" : {
-                "TagList": [{"Key" : "created_by", "Value": "not-dbsnap-copy"}]
-            },
-            "arn:7" : {"TagList": []},
-        }
-
-        def fake_list_tags_for_resource(ResourceName):
-            return self.fake_tags[ResourceName]
-
-        self.fake_list_tags = fake_list_tags_for_resource
+class TestRdsFuncs(TestHelper):
 
     def test_get_available_snapshots(self):
         session = mock.MagicMock()
-        session.describe_db_snapshots.return_value = self.fake_snapshot_desc 
+        session.describe_db_snapshots.return_value = self.fake_snapshot_desc
         r = get_available_snapshots(session, "whatever")
         self.assertEqual(len(r), 5)
 
@@ -108,9 +32,11 @@ class TestRdsFuncs(unittest.TestCase):
                     "DBSnapshotIdentifier": "rds:snapshot4",
                     "Status": "pending",
                     "SnapshotCreateTime": 200,
-                    "SnapshotType" : "automatic",
-                    "DBSnapshotArn" : "arn:1"
-                },
+                    "SnapshotType": "automatic",
+                    "DBSnapshotArn": "arn:1",
+                    "Engine": "postgres",
+                    "EngineVersion": "9.6.6",
+                }
             ]
         }
 
@@ -123,53 +49,40 @@ class TestRdsFuncs(unittest.TestCase):
         r = get_latest_snapshot(session, "my-db")
         self.assertEqual(r.id, "rds:snapshot3")
 
-    def test_get_database_description(self):
-        session = mock.MagicMock()
-        session.describe_db_instances.return_value = self.db_instance_1
-        r = get_database_description(session, "instance1")
-        self.assertEqual(r["DBSnapshotIdentifier"], "instance1")
-
-    def test_get_database_description_is_none(self):
-        session = mock.MagicMock()
-        session.exceptions.DBInstanceNotFoundFault = rds.exceptions.DBInstanceNotFoundFault
-        session.describe_db_instances.side_effect = rds.exceptions.DBInstanceNotFoundFault({}, '')
-        r = get_database_description(session, "instanceX")
-        self.assertEqual(r, None)
-
-    def test_destroy_database_missing_safety_tag(self):
+    def test_delete_verified_database_missing_safety_tag(self):
         session = mock.MagicMock()
         session.list_tags_for_resource.return_value = {
-            "TagList" : [
-                { "Key" : "irrelevant", "Value" : "1" }
-            ]
+            "TagList": [{"Key": "irrelevant", "Value": "1"}]
         }
-        with self.assertRaises(Exception):
-            r = destroy_database(
-                session, identifier="my-db" , db_arn="arn:rds:1234"
-            )
-
-    def test_destroy_database_incorrect_safety_tag_value(self):
-        session = mock.MagicMock()
-        session.list_tags_for_resource.return_value = {
-            "TagList" : [
-                { "Key" : SAFETY_TAG_KEY, "Value" : "1" }
-            ]
-        }
-        with self.assertRaises(Exception):
-            r = destroy_database(
-                session, identifier="my-db" , db_arn="arn:rds:1234"
-            )
-
-    def test_destroy_database(self):
-        session = mock.MagicMock()
-        session.list_tags_for_resource.return_value = {
-            "TagList" : [
-                { "Key" : SAFETY_TAG_KEY, "Value" : SAFETY_TAG_VAL }
-            ]
-        }
-        r = destroy_database(
-            session, identifier="my-db" , db_arn="arn:rds:1234"
+        database = Database(
+            session=session, description=self.db_instance_desc_1["DBInstances"][0]
         )
+        database.session = session
+        with self.assertRaises(Exception):
+            delete_verified_database(database)
+
+    def test_delete_verified_database_incorrect_safety_tag_value(self):
+        session = mock.MagicMock()
+        session.list_tags_for_resource.return_value = {
+            "TagList": [{"Key": SAFETY_TAG_KEY, "Value": "1"}]
+        }
+        database = Database(
+            session=session, description=self.db_instance_desc_1["DBInstances"][0]
+        )
+        database.session = session
+        with self.assertRaises(Exception):
+            delete_verified_database(database)
+
+    def test_delete_verified_database(self):
+        session = mock.MagicMock()
+        session.list_tags_for_resource.return_value = {
+            "TagList": [{"Key": SAFETY_TAG_KEY, "Value": SAFETY_TAG_VAL}]
+        }
+        database = Database(
+            session=session, description=self.db_instance_desc_1["DBInstances"][0]
+        )
+        database.session = session
+        delete_verified_database(database)
 
     def test_get_available_dbsnap_snapshots(self):
         session = mock.MagicMock()
@@ -179,7 +92,7 @@ class TestRdsFuncs(unittest.TestCase):
         self.assertEqual(len(r), 4)
 
     def test_get_old_dbsnap_snapshots(self):
-        #session, db_id, keep_count)
+        # session, db_id, keep_count)
         session = mock.MagicMock()
         session.list_tags_for_resource.side_effect = self.fake_list_tags
         session.describe_db_snapshots.return_value = self.fake_snapshot_desc
@@ -203,3 +116,15 @@ class TestRdsFuncs(unittest.TestCase):
         self.assertEqual(r[1].id, "rds:snapshot2")
         self.assertEqual(r[2].id, "rds:snapshot5")
         self.assertEqual(r[3].id, "rds:snapshot3")
+
+    def test_dbsnap_verify_identifier(self):
+        with self.assertRaises(ValueError):
+            dbsnap_verify_identifier("a" * 64)
+
+        with self.assertRaises(ValueError):
+            dbsnap_verify_identifier("a" * 59)
+
+        new_identifier = dbsnap_verify_identifier("a" * 58)
+
+        self.assertTrue(new_identifier.startswith("dbsv-"))
+        self.assertTrue(new_identifier.endswith("a"))

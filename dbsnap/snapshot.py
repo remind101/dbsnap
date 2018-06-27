@@ -4,15 +4,18 @@ from .utils import get_tags_for_rds_arn
 class Snapshot(object):
     """Normalise DB Instance and Cluster Snapshots into a single type."""
 
-    def __init__(self, snapshot_description, session=None):
+    def __init__(self, description, session=None):
 
-        self.description = snapshot_description
+        self.description = description
         self.session = session
 
+        self.setattrs_from_description()
+
+    def setattrs_from_description(self):
         if self.is_cluster:
-            self.compose_cluster_snapshot()
+            self.compose_cluster()
         else:
-            self.compose_db_instance_snapshot()
+            self.compose_instance()
 
     @property
     def is_cluster(self):
@@ -32,28 +35,28 @@ class Snapshot(object):
     def region(self):
         return self.arn.split(":")[3]
 
-    def _compose_common_snapshot(self):
+    def _compose_common(self):
         self.type = self.description["SnapshotType"]
         self.status = self.description["Status"]
         # only snapshots in available status have this key.
         self.created_time = self.description.get("SnapshotCreateTime")
         self.kms_key_id = self.description.get("KmsKeyId")
+        self.engine = self.description["Engine"]
+        self.engine_version = self.description["EngineVersion"]
 
-    def compose_cluster_snapshot(self):
-        self._compose_common_snapshot()
+    def compose_cluster(self):
+        self._compose_common()
         self.arn = self.description["DBClusterSnapshotArn"]
         self.id = self.description["DBClusterSnapshotIdentifier"]
 
-    def compose_db_instance_snapshot(self):
-        self._compose_common_snapshot()
+    def compose_instance(self):
+        self._compose_common()
         self.arn = self.description["DBSnapshotArn"]
         self.id = self.description["DBSnapshotIdentifier"]
 
     def delete(self):
         if self.is_cluster:
-            self.session.delete_db_cluster_snapshot(
-                DBClusterSnapshotIdentifier=self.id
-            )
+            self.session.delete_db_cluster_snapshot(DBClusterSnapshotIdentifier=self.id)
         else:
             self.session.delete_db_snapshot(DBSnapshotIdentifier=self.id)
 

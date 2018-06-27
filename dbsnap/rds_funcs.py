@@ -10,28 +10,13 @@ except ImportError:
     from string import ascii_letters as letters
 
 from .snapshot import Snapshot
+from .database import Database
 
 
 VALID_SNAPSHOT_TYPES = ["automated", "manual"]
 
 SAFETY_TAG_KEY = "dbsnap-verify"
 SAFETY_TAG_VAL = "true"
-
-
-def get_rds_type(session, identifier):
-    try:
-        session.describe_db_instances(DBInstanceIdentifier=identifier)["DBInstances"]
-        return "db"
-    except session.exceptions.DBInstanceNotFoundFault:
-        pass
-    try:
-        session.describe_db_clusters(DBClusterIdentifier=identifier)["DBClusters"]
-        return "cluster"
-    except session.exceptions.DBClusterNotFoundFault:
-        pass
-    raise LookupError(
-        "No RDS DB or Cluster found with identifier: {}".format(identifier)
-    )
 
 
 def get_available_snapshots(session, identifier, snapshot_type=None):
@@ -47,17 +32,23 @@ def get_available_snapshots(session, identifier, snapshot_type=None):
     Returns:
         list: A list of dbsnap.Snapshot objects.
     """
-    if get_rds_type(session, identifier) == "db":
-        args = {"DBInstanceIdentifier": identifier}
-        snapshots = session.describe_db_snapshots(**args)["DBSnapshots"]
-    else:
-        args = {"DBClusterIdentifier": identifier}
-        snapshots = session.describe_db_cluster_snapshots(**args)["DBClusterSnapshots"]
+    args = {}
 
     if snapshot_type:
         if snapshot_type not in VALID_SNAPSHOT_TYPES:
-            raise ValueError("Invalid snapshot_type: %s" % snapshot_type)
+            raise ValueError("Invalid snapshot_type: {}".format(snapshot_type))
         args["SnapshotType"] = snapshot_type
+
+    # assume identifier is for a regular RDS database.
+    snapshots = session.describe_db_snapshots(DBInstanceIdentifier=identifier, **args)[
+        "DBSnapshots"
+    ]
+
+    if not snapshots:
+        # assume identifier is for a cluster RDS database.
+        snapshots = session.describe_db_cluster_snapshots(
+            DBClusterIdentifier=identifier, **args
+        )["DBClusterSnapshots"]
 
     # convert snapshot descriptions into normalized Snapshot objects.
     snapshots = [Snapshot(snapshot, session) for snapshot in snapshots]
@@ -121,7 +112,7 @@ def get_latest_snapshot(session, identifier, snapshot_type=None):
     snapshots = get_available_snapshots(session, identifier, snapshot_type)
     if not snapshots:
         raise ValueError(
-            "No available snapshots for database id: {}".format(identifier)
+            "No available snapshots found for identifier: {}".format(identifier)
         )
     return snapshots[-1]
 
@@ -143,7 +134,14 @@ def dbsnap_verify_identifier(identifier):
     Args:
         identifier (str): The database instance identifier to derive new name.
     """
-    return "dbsnap-verify-{}".format(identifier)
+    new_identifier = "dbsv-{}".format(identifier)
+    if len(new_identifier) >= 64:
+        raise ValueError(
+            "The generated identifier for the restore ({}) is too long. It must be between 1-63 charecters.".format(
+                new_identifier
+            )
+        )
+    return new_identifier
 
 
 def get_database_subnet_group_description(session, identifier):
@@ -189,76 +187,68 @@ def restore_from_latest_snapshot(session, identifier, sn_ids):
         identifier (str): The database instance identifier whose snapshots you
             want to examine.
     """
-    latest_snapshot_id = get_latest_snapshot_id(session, identifier)
+    snapshot = get_latest_snapshot(session, identifier)
 
     safer_create_database_subnet_group(session, identifier, sn_ids)
 
     new_identifier = dbsnap_verify_identifier(identifier)
-    session.restore_db_instance_from_db_snapshot(
-        DBInstanceIdentifier=new_identifier,
-        DBSubnetGroupName=new_identifier,
-        DBSnapshotIdentifier=latest_snapshot_id,
-        PubliclyAccessible=False,
-        MultiAZ=False,
-        Tags=[
-            {"Key": "Name", "Value": new_identifier},
-            {"Key": SAFETY_TAG_KEY, "Value": SAFETY_TAG_VAL},
-        ],
-    )
+
+    if snapshot.is_cluster:
+        session.restore_db_cluster_from_snapshot(
+            DBClusterIdentifier=new_identifier,
+            DBSubnetGroupName=new_identifier,
+            SnapshotIdentifier=snapshot.id,
+            Engine=snapshot.engine,
+            EngineVersion=snapshot.engine_version,
+            Tags=[
+                {"Key": "Name", "Value": new_identifier},
+                {"Key": SAFETY_TAG_KEY, "Value": SAFETY_TAG_VAL},
+            ],
+        )
+
+    else:
+        session.restore_db_instance_from_db_snapshot(
+            DBInstanceIdentifier=new_identifier,
+            DBSubnetGroupName=new_identifier,
+            DBSnapshotIdentifier=snapshot.id,
+            PubliclyAccessible=False,
+            MultiAZ=False,
+            Tags=[
+                {"Key": "Name", "Value": new_identifier},
+                {"Key": SAFETY_TAG_KEY, "Value": SAFETY_TAG_VAL},
+            ],
+        )
 
 
-def get_database_description(session, identifier):
-    """
-    Returns database description document or None.
+def modify_instance_or_cluster_for_verify(database, sg_ids):
+    """Modify an RDS Instance or Cluster to allow connections.
     Args:
-        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
-            connection where the database is located.
-        identifier (str): The RDS database instance identifier.
-    Returns:
-        dictionary: description of RDS database instance
-    """
-    try:
-        return session.describe_db_instances(DBInstanceIdentifier=identifier)[
-            "DBInstances"
-        ][0]
-    except session.exceptions.DBInstanceNotFoundFault:
-        return None
-
-
-def get_database_events(session, identifier, event_catagories=None, duration=1440):
-    if not event_catagories:
-        event_catagories = []
-    return session.describe_events(
-        SourceIdentifier=identifier,
-        SourceType="db-instance",
-        EventCategories=event_catagories,
-        Duration=duration,
-    )["Events"]
-
-
-def rds_event_messages(session, identifier, event_catagories=None, duration=1440):
-    events = get_database_events(session, identifier, event_catagories, duration)
-    return [i["Message"] for i in events]
-
-
-def modify_db_instance_for_verify(session, identifier, sg_ids):
-    """Modify RDS DB Instance to allow connections.
-    Args:
-        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
-            connection where the database is located.
-        identifier (str): The RDS database instance identifier to reset.
+        database (:class:`dbsnap.database.Database`): the database or cluster
+            to modify to allow access for verification routines.
+        sg_ids (list): Security group ids to add to instance or cluster.
     Returns:
         str: new raw password
     """
     # 16 chars was an arbitrary choice.
     new_password = generate_password(16)
-    session.modify_db_instance(
-        ApplyImmediately=True,
-        DBInstanceIdentifier=identifier,
-        VpcSecurityGroupIds=sg_ids,
-        BackupRetentionPeriod=0,
-        MasterUserPassword=new_password,
-    )
+
+    if database.is_cluster:
+        database.session.modify_db_cluster(
+            ApplyImmediately=True,
+            DBClusterIdentifier=database.id,
+            VpcSecurityGroupIds=sg_ids,
+            BackupRetentionPeriod=1,
+            PreferredMaintenanceWindow="Sun:18:00-Sun:23:59",
+            MasterUserPassword=new_password,
+        )
+    else:
+        database.session.modify_db_instance(
+            ApplyImmediately=True,
+            DBInstanceIdentifier=database.id,
+            VpcSecurityGroupIds=sg_ids,
+            BackupRetentionPeriod=0,
+            MasterUserPassword=new_password,
+        )
     return new_password
 
 
@@ -284,27 +274,15 @@ def get_tags_for_rds_arn(session, rds_arn):
     )
 
 
-def destroy_database(session, identifier, db_arn=None):
-    """Destroy the RDS db instance.
-    Args:
-        session (:class:`boto.rds2.layer1.RDSConnection`): The RDS api
-            connection where the database is located.
-        identifier (str): The RDS database instance identifier to destroy.
-    """
-    if db_arn is None:
-        description = get_database_description(session, identifier)
-        db_arn = description["DBInstanceArn"]
-
-    tags = get_tags_for_rds_arn(session, db_arn)
-
-    if tags.get(SAFETY_TAG_KEY) != SAFETY_TAG_VAL:
+def delete_verified_database(database):
+    """Given a dbsnap.database.Database object, delete if properly tagged."""
+    if database.tags.get(SAFETY_TAG_KEY) != SAFETY_TAG_VAL:
         raise Exception(
             "sheepishly refusing to destroy {}, missing `{}` tag".format(
                 identifier, SAFETY_TAG_KEY
             )
         )
-
-    session.delete_db_instance(DBInstanceIdentifier=identifier, SkipFinalSnapshot=True)
+    database.delete()
 
 
 def destroy_database_subnet_group(session, identifier):

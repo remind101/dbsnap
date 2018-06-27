@@ -15,7 +15,6 @@ from dbsnap_copy import (
 
 
 class TestDbSnapcopy(unittest.TestCase):
-
     def test_invalid_parse_source(self):
         source = "bad_source"
         with self.assertRaises(ValueError):
@@ -48,7 +47,7 @@ class TestDbSnapcopy(unittest.TestCase):
             scenario(":", source_region, None),
             scenario("us-west-1:", "us-west-1", None),
             scenario(":my-snap", source_region, "my-snap"),
-            scenario("us-west-1:my-snap", "us-west-1", "my-snap")
+            scenario("us-west-1:my-snap", "us-west-1", "my-snap"),
         )
 
         for t in tests:
@@ -71,9 +70,8 @@ class TestDbSnapcopy(unittest.TestCase):
     def test_get_snapshot_target_name(self):
         now = datetime.utcfromtimestamp(0)
         r = get_snapshot_target_name(
-            Dest("us-east-1", "my-snap"), "source", "us-east-1", now)
+            Dest("us-east-1", "my-snap"), "source", "us-east-1", now
+        )
         self.assertEqual(r, "my-snap")
-        r = get_snapshot_target_name(
-            Dest("us-east-1", ""), "source", "us-east-1", now)
+        r = get_snapshot_target_name(Dest("us-east-1", ""), "source", "us-east-1", now)
         self.assertEqual(r, "source-copy-us-east-1-19700101T000000Z")
-

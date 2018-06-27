@@ -8,7 +8,7 @@ import boto3
 
 from dbsnap.rds_funcs import dbsnap_verify_identifier
 
-DB_ID_PREFIX_LEN = 14
+DB_ID_PREFIX_LEN = 5
 
 try:
     basestring
@@ -28,7 +28,10 @@ class DocToObject(object):
 
     def setattrs_from_dict(self, dictionary):
         for key, value in dictionary.items():
-            setattr(self, key, value)
+            try:
+                setattr(self, key, value)
+            except AttributeError:
+                pass
 
     def __init__(self, document=None):
         """document (json/dictionary): a document to turn into an object."""

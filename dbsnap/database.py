@@ -93,9 +93,11 @@ class Database(object):
             ]
 
     def create_cluster_instance(
-        self, instance_identifier, instance_class="db.r4.large"
+        self, instance_identifier, instance_class="db.r4.large", tags=None
     ):
         """Create an instance for this cluster."""
+        if tags is None:
+            tags = []
         if self.is_cluster:
             self.session.create_db_instance(
                 DBInstanceIdentifier=instance_identifier,
@@ -103,6 +105,7 @@ class Database(object):
                 Engine=self.engine,
                 EngineVersion=self.engine_version,
                 DBInstanceClass=instance_class,
+                Tags=tags,
             )
 
     def delete(self):

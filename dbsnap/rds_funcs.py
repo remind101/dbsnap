@@ -224,7 +224,7 @@ def create_cluster_instance(cluster, instance_identifier):
     # No straight forward way to use the same instance class as
     # the source cluster (Aurora) but not sure it matters.
     # Hardcoding this instance_class, currently the smallest/cheapest.
-    tmp_database.create_cluster_instance(
+    cluster.create_cluster_instance(
         instance_identifier,
         "db.r4.large",
         tags=[

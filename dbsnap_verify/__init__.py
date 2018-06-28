@@ -1,6 +1,7 @@
 from dbsnap.rds_funcs import (
     get_latest_snapshot,
     restore_from_latest_snapshot,
+    create_cluster_instance,
     modify_instance_or_cluster_for_verify,
     delete_verified_database,
     destroy_database_subnet_group,
@@ -72,11 +73,8 @@ def restore(state_doc, rds_session):
                 logger.info(
                     "Creating cluster member instance for cluster (%s)", tmp_database.id
                 )
-                # No straight forward way to use the same instance class as
-                # the source for clusters (Aurora) but not sure it matters.
-                # Hardcoding this instance_class as it's currently the smallest/cheapest.
                 instance_identifier = "i-{}".format(tmp_database.id)
-                tmp_database.create_cluster_instance(instance_identifier, "db.r4.large")
+                create_cluster_instance(tmp_database, instance_identifier)
                 # exit early, we need an available cluster instance to continue.
                 return None
 

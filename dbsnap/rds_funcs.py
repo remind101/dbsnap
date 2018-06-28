@@ -220,6 +220,20 @@ def restore_from_latest_snapshot(session, identifier, sn_ids):
         )
 
 
+def create_cluster_instance(cluster, instance_identifier):
+    # No straight forward way to use the same instance class as
+    # the source cluster (Aurora) but not sure it matters.
+    # Hardcoding this instance_class, currently the smallest/cheapest.
+    tmp_database.create_cluster_instance(
+        instance_identifier,
+        "db.r4.large",
+        tags=[
+            {"Key": "Name", "Value": instance_identifier},
+            {"Key": SAFETY_TAG_KEY, "Value": SAFETY_TAG_VAL},
+        ]
+    )
+
+
 def modify_instance_or_cluster_for_verify(database, sg_ids):
     """Modify an RDS Instance or Cluster to allow connections.
     Args:

@@ -103,41 +103,34 @@ def modify(state_doc, rds_session):
     """modify: currently modifying the temporary RDS db instance
     settings to allow the dbsnap-verify tool to access it."""
     tmp_database = Database(session=rds_session, identifier=state_doc.tmp_database)
-    logger.info(
-        "Modifying %s master password and security groups", state_doc.tmp_database
-    )
-    state_doc.tmp_password = modify_instance_or_cluster_for_verify(
-        tmp_database, state_doc.security_group_ids
-    )
-    state_doc.transition_state("verify")
-    verify(state_doc, rds_session)
+    if state_doc.tmp_password is None:
+        logger.info(
+            "Modifying %s master password and security groups", state_doc.tmp_database
+        )
+        state_doc.tmp_password = modify_instance_or_cluster_for_verify(
+            tmp_database, state_doc.security_group_ids
+        )
+        state_doc.save()
+    elif (
+        tmp_database and
+        tmp_database.status == "available" and
+        "Reset master credentials" in tmp_database.event_messages
+    ):
+        state_doc.transition_state("verify")
+        verify(state_doc, rds_session)
+    else:
+        logger.info("Waiting for master credentials reset for %s", state_doc.tmp_database)
 
 
 def verify(state_doc, rds_session):
     """verify: currently verifying the temporary RDS db instance
     using the supplied checks. (not implemented)"""
-    tmp_database = Database(session=rds_session, identifier=state_doc.tmp_database)
-    if (
-        "Reset master credentials" in tmp_database.event_messages
-        and tmp_database.status == "available"
-    ):
-        # TODO: this is currently not implemented so we move to cleanup.
-        # in the future this code block will actually connect to the endpoint
-        # and run SQL query checks defined by the configuration.
-        logger.info("Skipping verify of %s, not implemented", state_doc.tmp_database)
-        # connection = connect_to_endpoint(db_description["endpoint"])
-        # result = run_all_the_tests(connection, state_doc.verfication_checks)
-        # if result:
-        #    state_doc.transition_state("cleanup")
-        # else:
-        #    state_doc.transition_state("alarm")
-        #    alarm(state_doc, "error")
-        state_doc.transition_state("cleanup")
-        cleanup(state_doc, rds_session)
-    else:
-        logger.info("Waiting for master credentials reset for %s", state_doc.tmp_database)
-
-
+    # TODO: this is currently not implemented so we move to cleanup.
+    # in the future this code block will actually connect to the endpoint
+    # and run SQL query checks defined by the configuration.
+    logger.info("Skipping verify of %s, not implemented", state_doc.tmp_database)
+    state_doc.transition_state("cleanup")
+    cleanup(state_doc, rds_session)
 
 def cleanup(state_doc, rds_session):
     """clean: currently tearing down the temporary RDS db instance

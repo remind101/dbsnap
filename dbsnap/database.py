@@ -6,9 +6,9 @@ class Database(object):
 
     def __init__(self, identifier=None, description=None, session=None):
 
-        self.session = session
-
+        self.id = None
         self.description = description
+        self.session = session
 
         if identifier:
             self.description = self.get_description_by_id(identifier)
@@ -18,7 +18,7 @@ class Database(object):
 
     def __bool__(self):
         """Consider this object False if description is None."""
-        if self.description is None:
+        if self.id is None:
             return False
         return True
 

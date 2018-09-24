@@ -20,6 +20,12 @@ def now_timestamp():
     return time.time()
 
 
+def timestamp_to_isoformat(ts):
+    from datetime import datetime
+
+    return datetime.utcfromtimestamp(ts).isoformat()
+
+
 class DocToObject(object):
     """
     Produce a Python object from a dict or json document.
@@ -147,7 +153,14 @@ class StateDoc(DocToObject):
                         self.current_state, new_state, self.valid_transitions
                     )
                 )
-        self.states.append({"state": new_state, "timestamp": now_timestamp()})
+        timestamp = now_timestamp()
+        self.states.append(
+            {
+                "state": new_state,
+                "timestamp": timestamp,
+                "utc_iso_format": timestamp_to_isoformat(timestamp),
+            }
+        )
         self.save()
 
     def trim_states(self, count_to_keep=100):

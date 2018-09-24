@@ -59,21 +59,21 @@ class TestSnapshot(unittest.TestCase):
 
     def test_db_instance_snapshot(self):
         snapshot = Snapshot(self.snapshot_description1)
-        self.assertEquals(snapshot.arn, self.snapshot_description1["DBSnapshotArn"])
-        self.assertEquals(
+        self.assertEqual(snapshot.arn, self.snapshot_description1["DBSnapshotArn"])
+        self.assertEqual(
             snapshot.id, self.snapshot_description1["DBSnapshotIdentifier"]
         )
-        self.assertEquals(snapshot.region, "us-east-1")
+        self.assertEqual(snapshot.region, "us-east-1")
 
     def test_cluster_snapshot(self):
         snapshot = Snapshot(self.snapshot_description2)
-        self.assertEquals(
+        self.assertEqual(
             snapshot.arn, self.snapshot_description2["DBClusterSnapshotArn"]
         )
-        self.assertEquals(
+        self.assertEqual(
             snapshot.id, self.snapshot_description2["DBClusterSnapshotIdentifier"]
         )
-        self.assertEquals(snapshot.region, "us-east-1")
+        self.assertEqual(snapshot.region, "us-east-1")
 
     def test_malformed_snapshot_description(self):
         with self.assertRaises(LookupError):

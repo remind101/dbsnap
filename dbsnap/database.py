@@ -112,16 +112,22 @@ class Database(object):
         """Destroy the RDS instance or cluster."""
         if self.is_cluster:
             for member_id in self.cluster_member_ids:
-                self.session.delete_db_instance(
-                    DBInstanceIdentifier=member_id, SkipFinalSnapshot=True
-                )
+                try:
+                    self.session.delete_db_instance(
+                        DBInstanceIdentifier=member_id, SkipFinalSnapshot=True
+                    )
+                except self.session.exceptions.InvalidDBInstanceStateFault:
+                    pass
             self.session.delete_db_cluster(
                 DBClusterIdentifier=self.id, SkipFinalSnapshot=True
             )
         else:
-            self.session.delete_db_instance(
-                DBInstanceIdentifier=self.id, SkipFinalSnapshot=True
-            )
+            try:
+                self.session.delete_db_instance(
+                    DBInstanceIdentifier=self.id, SkipFinalSnapshot=True
+                )
+            except self.session.exceptions.InvalidDBInstanceStateFault:
+                pass
 
     def get_events(self, event_catagories=None, duration=1440):
         events = []

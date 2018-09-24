@@ -112,14 +112,16 @@ def modify(state_doc, rds_session):
         )
         state_doc.save()
     elif (
-        tmp_database and
-        tmp_database.status == "available" and
-        "Reset master credentials" in tmp_database.event_messages
+        tmp_database
+        and tmp_database.status == "available"
+        and "Reset master credentials" in tmp_database.event_messages
     ):
         state_doc.transition_state("verify")
         verify(state_doc, rds_session)
     else:
-        logger.info("Waiting for master credentials reset for %s", state_doc.tmp_database)
+        logger.info(
+            "Waiting for master credentials reset for %s", state_doc.tmp_database
+        )
 
 
 def verify(state_doc, rds_session):
@@ -131,6 +133,7 @@ def verify(state_doc, rds_session):
     logger.info("Skipping verify of %s, not implemented", state_doc.tmp_database)
     state_doc.transition_state("cleanup")
     cleanup(state_doc, rds_session)
+
 
 def cleanup(state_doc, rds_session):
     """clean: currently tearing down the temporary RDS db instance

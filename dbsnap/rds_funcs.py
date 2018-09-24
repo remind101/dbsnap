@@ -12,7 +12,6 @@ except ImportError:
 from .snapshot import Snapshot
 from .database import Database
 
-
 VALID_SNAPSHOT_TYPES = ["automated", "manual"]
 
 SAFETY_TAG_KEY = "dbsnap-verify"
@@ -230,7 +229,7 @@ def create_cluster_instance(cluster, instance_identifier):
         tags=[
             {"Key": "Name", "Value": instance_identifier},
             {"Key": SAFETY_TAG_KEY, "Value": SAFETY_TAG_VAL},
-        ]
+        ],
     )
 
 
@@ -266,34 +265,12 @@ def modify_instance_or_cluster_for_verify(database, sg_ids):
     return new_password
 
 
-def make_tag_dict(tag_list):
-    """Returns a dictionary of existing tags.
-    Args:
-        tag_list (list): a list of tag dicts.
-    Returns:
-        dict: A dictionary where tag names are keys and tag values are values.
-    """
-    return {i["Key"]: i["Value"] for i in tag_list}
-
-
-def get_tags_for_rds_arn(session, rds_arn):
-    """Returns a dictionary of existing tags.
-    Args:
-        rds_arn (str): an RDS resource ARN.
-    Returns:
-        dict: A dictionary where tag names are keys and tag values are values.
-    """
-    return make_tag_dict(
-        session.list_tags_for_resource(ResourceName=rds_arn)["TagList"]
-    )
-
-
 def delete_verified_database(database):
     """Given a dbsnap.database.Database object, delete if properly tagged."""
     if database.tags.get(SAFETY_TAG_KEY) != SAFETY_TAG_VAL:
         raise Exception(
             "sheepishly refusing to destroy {}, missing `{}` tag".format(
-                identifier, SAFETY_TAG_KEY
+                database.id, SAFETY_TAG_KEY
             )
         )
     database.delete()
@@ -306,5 +283,8 @@ def destroy_database_subnet_group(session, identifier):
             connection where the database is located.
         identifier (str): The RDS database instance subnet identifier to destroy.
     """
-    if get_database_subnet_group_description(session, identifier) is not None:
+    try:
         session.delete_db_subnet_group(DBSubnetGroupName=identifier)
+    except session.exceptions.DBSubnetGroupNotFoundFault:
+        # if it doesn't exist, there is nothing to delete.
+        pass

@@ -131,6 +131,7 @@ def verify(state_doc, rds_session):
     # in the future this code block will actually connect to the endpoint
     # and run SQL query checks defined by the configuration.
     logger.info("Skipping verify of %s, not implemented", state_doc.tmp_database)
+    logger.info(dbsnap_verify_datadog_output(state_doc, "OK"))
     state_doc.transition_state("cleanup")
     cleanup(state_doc, rds_session)
 
@@ -145,7 +146,6 @@ def cleanup(state_doc, rds_session):
         destroy_database_subnet_group(rds_session, state_doc.tmp_database)
         # remove tmp_password, clear old states.
         state_doc.clean()
-        logger.info(dbsnap_verify_datadog_output(state_doc, "OK"))
         # wait for next snapshot (which could appear tomorrow).
         state_doc.transition_state("wait")
     elif tmp_database.status == "available":

@@ -27,7 +27,7 @@ logger = logging.getLogger("dbsnap")
 
 def dbsnap_verify_datadog_output(state_doc, alarm_status="OK"):
     return datadog_lambda_check_output(
-        metric_name="dbsnap-verify.status",
+        metric_name="dbsnap_verify.status",
         metric_value=alarm_status,
         metric_tags={"database": state_doc.database},
     )

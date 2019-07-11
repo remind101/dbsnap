@@ -8,7 +8,6 @@ import boto3
 
 from dbsnap.rds_funcs import dbsnap_verify_identifier
 
-DB_ID_PREFIX_LEN = 5
 
 try:
     basestring
@@ -307,8 +306,8 @@ def get_state_doc_from_sns_event(event):
     """Return state_doc (or None) for a RDS event, instead of config event."""
     try:
         event_payload = json.loads(event["Records"][0]["Sns"]["Message"])
-        # strip "dbsnap-verify-" from tmp_database name.
-        database_id = event_payload["Source ID"][DB_ID_PREFIX_LEN:]
+        # split tmp_database name by "dbsv-" and grab the half.
+        database_id = event_payload["Source ID"].split("dbsv-")[-1]
         rds_event_message = event_payload["Event Message"]
 
     except KeyError:

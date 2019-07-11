@@ -11,7 +11,11 @@ from dbsnap.database import Database
 
 from .state_doc import get_or_create_state_doc
 
-from .datadog_output import datadog_lambda_check_output
+from .datadog_output import (
+    datadog_lambda_check_output,
+    datadog_lambda_metric_output,
+)
+
 
 import boto3
 
@@ -25,10 +29,19 @@ import logging
 logger = logging.getLogger("dbsnap")
 
 
-def dbsnap_verify_datadog_output(state_doc, alarm_status="OK"):
+def datadog_dbsnap_verify_status_check(state_doc, alarm_status="OK"):
     return datadog_lambda_check_output(
         metric_name="dbsnap_verify.status",
         metric_value=alarm_status,
+        metric_tags={"database": state_doc.database},
+    )
+
+
+def datadog_dbsnap_verify_wakeup_count(state_doc):
+    return datadog_lambda_metric_output(
+        metric_name="dbsnap_verify.wakeup",
+        metric_value=1,
+        metric_type="count",
         metric_tags={"database": state_doc.database},
     )
 
@@ -131,7 +144,7 @@ def verify(state_doc, rds_session):
     # in the future this code block will actually connect to the endpoint
     # and run SQL query checks defined by the configuration.
     logger.info("Skipping verify of %s, not implemented", state_doc.tmp_database)
-    logger.info(dbsnap_verify_datadog_output(state_doc, "OK"))
+    logger.info(datadog_dbsnap_verify_status_check(state_doc, "OK"))
     state_doc.transition_state("cleanup")
     cleanup(state_doc, rds_session)
 
@@ -157,7 +170,7 @@ def cleanup(state_doc, rds_session):
 
 def alarm(state_doc, rds_session):
     """"alarm: something went wrong we are going to scream about it."""
-    logger.error(dbsnap_verify_datadog_output(state_doc, "CRITICAL"))
+    logger.error(datadog_dbsnap_verify_status_check(state_doc, "CRITICAL"))
 
 
 state_handlers = {
@@ -179,6 +192,7 @@ def handler(event):
         # from from Cloudwatch or SNS, like an unrelated RDS db instance.
         logger.info("Ignoring unrelated RDS event.")
     else:
+        logger.info(datadog_dbsnap_verify_wakeup_count(state_doc))
         state_handler = state_handlers[state_doc.current_state]
         rds_session = boto3.client(
             "rds", region_name=state_doc.snapshot_region, config=BOTO3_CONFIG

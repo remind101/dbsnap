@@ -118,13 +118,13 @@ class TestRdsFuncs(TestHelper):
         self.assertEqual(r[3].id, "rds:snapshot3")
 
     def test_dbsnap_verify_identifier(self):
-        with self.assertRaises(ValueError):
-            dbsnap_verify_identifier("a" * 64)
 
-        with self.assertRaises(ValueError):
-            dbsnap_verify_identifier("a" * 59)
-
-        new_identifier = dbsnap_verify_identifier("a" * 58)
-
+        db_id = "test-acmein"
+        new_identifier = dbsnap_verify_identifier(db_id)
         self.assertTrue(new_identifier.startswith("dbsv-"))
-        self.assertTrue(new_identifier.endswith("a"))
+        self.assertEqual(new_identifier, "dbsv-test-acmein")
+
+        # test truncated case.
+        db_id = "test-acmein-com-pg-aurora-multitenant-dbcluster-146qo1hzclehn"
+        new_identifier = dbsnap_verify_identifier(db_id)
+        self.assertEqual(new_identifier, "dbsv-test-acmein-com-pg-aurora-multitenant-dbcluster-146qo1hzcl")

@@ -134,12 +134,10 @@ def dbsnap_verify_identifier(identifier):
         identifier (str): The database instance identifier to derive new name.
     """
     new_identifier = "dbsv-{}".format(identifier)
-    if len(new_identifier) >= 64:
-        raise ValueError(
-            "The generated identifier for the restore ({}) is too long. It must be between 1-63 charecters.".format(
-                new_identifier
-            )
-        )
+    if len(new_identifier) > 63:
+        # then generated identifier for the restore much be between 1-63 charecters.
+        # so we truncate new_identifier to 63 charecters.
+        new_identifier = new_identifier[:63]
     return new_identifier
 
 

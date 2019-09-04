@@ -136,8 +136,8 @@ def dbsnap_verify_identifier(identifier):
     new_identifier = "dbsv-{}".format(identifier)
     if len(new_identifier) > 63:
         # then generated identifier for the restore much be between 1-63 charecters.
-        # so we truncate new_identifier to 63 charecters.
-        new_identifier = new_identifier[:63]
+        # so we truncate new_identifier to 60 charecters.
+        new_identifier = new_identifier[:60]
     return new_identifier
 
 

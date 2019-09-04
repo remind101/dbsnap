@@ -127,4 +127,4 @@ class TestRdsFuncs(TestHelper):
         # test truncated case.
         db_id = "test-acmein-com-pg-aurora-multitenant-dbcluster-146qo1hzclehn"
         new_identifier = dbsnap_verify_identifier(db_id)
-        self.assertEqual(new_identifier, "dbsv-test-acmein-com-pg-aurora-multitenant-dbcluster-146qo1hzcl")
+        self.assertEqual(new_identifier, "dbsv-test-acmein-com-pg-aurora-multitenant-dbcluster-146qo1h")
